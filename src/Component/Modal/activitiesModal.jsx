@@ -23,9 +23,9 @@ const ActivityModal = ({ isOpen, onClose, onSubmit }) => {
   if (!isOpen) return null
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-      <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200 w-full max-w-md">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-emerald-500">
+      <div className="bg-white rounded-xl p-4 border border-gray-200 w-full max-w-md">
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-emerald-500">
             Add Activity
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -33,44 +33,44 @@ const ActivityModal = ({ isOpen, onClose, onSubmit }) => {
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-2">
           <input
             type="text"
             placeholder="Activity Title"
             value={activity.title}
             onChange={(e) => setActivity({...activity, title: e.target.value})}
-            className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-gray-700 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200"
+            className="w-full px-2 py-1 bg-gray-50 rounded-md border border-gray-200 text-gray-700 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200"
           />
           
           <textarea
             placeholder="Activity Description"
             value={activity.description}
             onChange={(e) => setActivity({...activity, description: e.target.value})}
-            className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-gray-700 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200"
+            className="w-full px-2 py-1 text-sm bg-gray-50 rounded-md border border-gray-200 text-gray-700 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200"
             rows={4}
           />
           
           <select
             value={activity.type}
             onChange={(e) => setActivity({...activity, type: e.target.value})}
-            className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-gray-700 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200"
+            className="w-full px-2 py-1 bg-gray-50 rounded-md border border-gray-200 text-gray-700 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200"
           >
             <option value="update">Update</option>
             <option value="milestone">Milestone</option>
             <option value="blocker">Blocker</option>
           </select>
   
-          <div className="flex gap-3">
+          <div className="flex">
             <button
               type="submit"
-              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-xl transform hover:scale-105 transition-all"
+              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-1.5 px-4 rounded-md transform hover:scale-105 transition-all"
             >
               Add Activity
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-4 rounded-xl transition-colors"
+              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-1.5 px-4 rounded-md transition-colors"
             >
               Cancel
             </button>
