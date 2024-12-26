@@ -186,6 +186,7 @@ const Client = () => {
               <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Client</th>
               <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Company</th>
               <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Email</th>
+              <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Password</th>
               <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Contact #</th>
               <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Address</th>
               <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Project Type</th>
@@ -209,6 +210,11 @@ const Client = () => {
                 <td className="p-2">
                   <div className="text-gray-600 truncate text-xs">
                     {client.email}
+                  </div>
+                </td>
+                <td className="p-2">
+                  <div className="text-gray-600 truncate text-xs">
+                    {client.password}
                   </div>
                 </td>
                 <td className="p-2">
