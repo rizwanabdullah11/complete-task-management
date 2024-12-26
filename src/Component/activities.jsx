@@ -27,7 +27,10 @@ const Activities = () => {
           }))];
         }
       });
-      setAllActivities(activities);
+      const sortedActivities = activities.sort((a, b) => 
+        new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date)
+      );
+      setAllActivities(sortedActivities);
     } catch (error) {
       console.log("Error fetching activities:", error);
     }
@@ -74,9 +77,6 @@ const Activities = () => {
                     Task: {activity.taskTitle}
                   </div>
                 </div>
-                <button className="text-sm text-green-500 hover:text-green-600 hover:underline">
-                  Delete
-                </button>
               </div>
             </div>
           ))}

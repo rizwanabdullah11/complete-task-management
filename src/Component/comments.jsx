@@ -14,10 +14,10 @@ const Comments = () => {
   const fetchAllComments = async () => {
     try {
       const tasksQuery = query(collection(db, "tasks"));
-      const task = await getDocs(tasksQuery);
+      const taskSnapshot = await getDocs(tasksQuery);
       
       let comments = [];
-      task.docs.forEach(doc => {
+      taskSnapshot.docs.forEach(doc => {
         const taskData = doc.data();
         if (taskData.comments) {
           comments = [...comments, ...taskData.comments.map(comment => ({
@@ -27,12 +27,16 @@ const Comments = () => {
           }))];
         }
       });
-      setAllComments(comments);
+      
+      const sortedComments = comments.sort((a, b) => 
+        new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date)
+      );
+      setAllComments(sortedComments);
     } catch (error) {
       console.log("Error fetching comments:", error);
     }
   };
-
+  
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-5xl mx-auto p-3">
@@ -89,9 +93,6 @@ const Comments = () => {
                     </div>
                   )}
                 </div>
-                <button className="text-sm text-green-500 hover:text-green-600 hover:underline">
-                  Delete
-                </button>
               </div>
             </div>
           ))}

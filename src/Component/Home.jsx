@@ -59,7 +59,7 @@ const Home = () => {
     return (
       <div 
         ref={drop} 
-        className={`bg-gray-100 bg-opacity-90 backdrop-blur-xl shadow-lg mb-4 border border-gray-200 text-center ${
+          className={`bg-gray-100 bg-opacity-90 backdrop-blur-xl shadow-lg mb-8 border border-gray-200 text-center ${
           isOver ? 'bg-green-50' : ''
         }`}
       >
@@ -92,28 +92,12 @@ const Home = () => {
     return () => variable()
   }, [])
 
-  // const fetchTasks = async (userId) => {
-  //   try {
-  //     const q = query(collection(db, "tasks"), where("userId", "==", userId))
-  //     const querySnapshot = await getDocs(q)
-  //     const tasksList = await Promise.all(querySnapshot.docs.map(async (doc) => {
-  //       const taskData = { id: doc.id, ...doc.data() }
-  //       return {
-  //         ...taskData,
-  //       }
-  //     }))
-  //     setTasks(tasksList)
-  //   } catch (error) {
-  //     console.log("Error fetching tasks:", error)
-  //   }
-  // }
   const fetchTasks = async (userId) => {
     try {
       const q = query(collection(db, "tasks"), where("userId", "==", userId))
       const querySnapshot = await getDocs(q)
       const tasksList = await Promise.all(querySnapshot.docs.map(async (doc) => {
         const data = { id: doc.id, ...doc.data() }
-        // Filter out user_data entries when displaying tasks
         if (data.type !== "user_data") {
           return data
         }
@@ -125,31 +109,21 @@ const Home = () => {
     }
   }
   
-
   const handleCreateTask = async (taskData) => {
     try {
-      if (editingTask) {
-        const taskRef = doc(db, "tasks", editingTask.id)
-        await updateDoc(taskRef, { ...taskData, updatedAt: new Date().toISOString() })
-        setTasks(tasks.map(task => 
-          task.id === editingTask.id ? { ...task, ...taskData } : task
-        ))
-      } else {
-        const newTask = {
-          ...taskData,
-          userId: auth.currentUser.uid,
-          createdAt: new Date().toISOString(),
-          status: 'pending'
-        }
-        const docRef = await addDoc(collection(db, "tasks"), newTask)
-        setTasks([...tasks, { ...newTask, id: docRef.id }])
-      }
-      setIsModalOpen(false)
-      setEditingTask(null)
+      const newTask = {
+        ...taskData,
+        userId: auth.currentUser.uid,
+        createdAt: new Date().toISOString(),
+        comments: taskData.comments || [],
+        activities: taskData.activities || []
+      };
+      const docRef = await addDoc(collection(db, "tasks"), newTask);
+      setTasks([{ ...newTask, id: docRef.id }, ...tasks]);
     } catch (error) {
-      console.log("Error handling task:", error)
+      console.error("Error creating task:", error);
     }
-  }
+  };
 
   const handleCreateSubTask = async (subtaskData) => {
     try {
@@ -380,6 +354,7 @@ const Home = () => {
                   <BsPerson className="w-3.5 h-3.5" />
                   {task.assigned || 'Unassigned'}
                 </span>
+                
                 {task.subTasks?.length > 0 && (
                   <div className="flex items-center border gap-1 p-1 border-2 text-gray-500 rounded-md">
                     <span className="text-xs">3/3</span>
@@ -426,8 +401,8 @@ const Home = () => {
         </div>
 
         {viewType === 'board' ? (
-          <div className="overflow-x-auto scrollbar-hide">
-            <div className="flex flex-col lg:flex-row">
+          <div className="w-full overflow-x-auto scrollbar-hide">
+            <div className="flex flex-col lg:flex-row" >
               <div className="inline-flex min-w-max gap-4 lg:grid lg:grid-cols-6 lg:gap-4">
                 <TaskColumn
                   title="Pending Tasks"

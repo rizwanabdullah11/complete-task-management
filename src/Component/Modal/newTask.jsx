@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import SubModal from '../SubModal/submodal';
 import CommentModal from './commentModal';
 import ActivityModal from './activitiesModal';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../Firebase';
 import { FaRegCircle } from 'react-icons/fa';
 
@@ -12,59 +12,102 @@ const NewTask = () => {
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
-  const [editingSubTask, setEditingSubTask] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [clients, setClients] = useState([]);
+  const { state } = useLocation();
+  const editingTask = state?.editingTask;
   const [taskData, setTaskData] = useState({
-    title: '',
-    description: '',
-    date: '',
-    assigned: '',
-    status: 'pending',
-    subTasks: [],
-    comments: [],
-    activities: []
+    title: editingTask?.title || '',
+    description: editingTask?.description || '',
+    date: editingTask?.date || '',
+    assigned: editingTask?.assigned || '',
+    status: editingTask?.status || 'pending',
+    client: editingTask?.client || '',
+    user: editingTask?.user || '',
+    subTasks: editingTask?.subTasks || [],
+    comments: editingTask?.comments || [],
+    activities: editingTask?.activities || []
   });
   const [errors, setErrors] = useState({});
 
+  useEffect(() => {
+    if (editingTask) {
+      setTaskData({
+        title: editingTask.title || '',
+        description: editingTask.description || '',
+        date: editingTask.date || '',
+        assigned: editingTask.assigned || '',
+        status: editingTask.status || 'pending',
+        client: editingTask.client || '',
+        user: editingTask.user || '',
+        subTasks: editingTask.subTasks || [],
+        comments: editingTask.comments || [],
+        activities: editingTask.activities || []
+      });
+    }
+  }, [editingTask]);
+
+  useEffect(() => {
+    const fetchUsersAndClients = async () => {
+      try {
+        const usersQuery = query(collection(db, "tasks"), where("type", "==", "user"));
+        const usersSnapshot = await getDocs(usersQuery);
+        const usersList = usersSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setUsers(usersList);
+
+        const clientsQuery = query(collection(db, "tasks"), where("type", "==", "client"));
+        const clientsSnapshot = await getDocs(clientsQuery);
+        const clientsList = clientsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setClients(clientsList);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchUsersAndClients();
+  }, []);
+
   const handleSubModalClose = () => {
     setIsSubModalOpen(false);
-    setEditingSubTask(null);
   };
 
   const handleCreateSubTask = (subTaskData) => {
-    if (editingSubTask) {
-      setTaskData(prev => ({
-        ...prev,
-        subTasks: prev.subTasks.map(subTask => 
-          subTask.id === editingSubTask.id ? { ...subTaskData, id: subTask.id } : subTask
-        )
-      }));
-    } else {
-      setTaskData(prev => ({
-        ...prev,
-        subTasks: [...prev.subTasks, { ...subTaskData, id: Date.now() }]
-      }));
-    }
+    setTaskData(prev => ({
+      ...prev,
+      subTasks: [...prev.subTasks, { ...subTaskData, id: Date.now() }]
+    }));
   };
-
   const handleCreateComment = (commentData) => {
     setTaskData(prev => ({
       ...prev,
-      comments: [...prev.comments, { 
-        ...commentData, 
+      comments: [...prev.comments, {
+        ...commentData,
         id: Date.now(),
         userName: auth.currentUser.displayName || 'Anonymous',
-        timestamp: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        date: new Date().toISOString()
       }]
     }));
   };
-
+  
   const handleCreateActivity = (activityData) => {
     setTaskData(prev => ({
       ...prev,
-      activities: [...prev.activities, { ...activityData, id: Date.now() }]
+      activities: [...prev.activities, {
+        ...activityData,
+        id: Date.now(),
+        createdAt: new Date().toISOString(),
+        date: new Date().toISOString()
+      }]
     }));
   };
-
+  
   const validateForm = () => {
     const newErrors = {};
     if (!taskData.title.trim()) newErrors.title = 'Title is required';
@@ -77,27 +120,34 @@ const NewTask = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (validateForm()) {
-      try {
-        const finalTaskData = {
-          ...taskData,
+    try {
+      const finalTaskData = {
+        ...taskData,
+        updatedAt: new Date().toISOString()
+      };
+  
+      if (editingTask) {
+        await updateDoc(doc(db, "tasks", editingTask.id), finalTaskData);
+      } else {
+        await addDoc(collection(db, "tasks"), {
+          ...finalTaskData,
           userId: auth.currentUser.uid,
-          timestamp: new Date(),
-          status: taskData.status || 'pending'
-        };
-        await addDoc(collection(db, "tasks"), finalTaskData);
-        navigate('/dashboard');
-      } catch (error) {
-        console.error("Error creating task:", error);
+          createdAt: new Date().toISOString()
+        });
       }
+      navigate('/dashboard');
+    } catch (error) {
+      console.error("Error handling task:", error);
     }
   };
+  
+
   return (
     <div className="min-h-screen bg-gray-100 py-16">
       <div className="max-w-2xl mx-auto bg-white rounded-xl border-2 border-gray-200 transform transition-all hover:scale-[1.01]">
         <div className="p-4 text-center border-b border-gray-100">
           <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-green-500 tracking-tight">
-            Create New Task
+            {editingTask ? 'Edit Task' : 'Create New Task'}
           </h2>
         </div>
 
@@ -122,48 +172,83 @@ const NewTask = () => {
                 rows="3"
               />
             </div>
-            <div className="space-y-2 ml-8">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600 text-sm font-semibold">Status</span>
-                <select
-                  value={taskData.status}
-                  onChange={(e) => setTaskData({...taskData, status: e.target.value})}
-                  className="px-2 bg-green-100 text-green-500 rounded-md text-sm border-none focus:outline-none"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="in-review">In Review</option>
-                  <option value="follow-up">Follow-up</option>
-                  <option value="backlog">Backlog</option>
-                  <option value="in-progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
+            <div className="ml-8">
+              <div className="grid grid-cols-1 gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 text-sm font-semibold w-20">Status</span>
+                  <select
+                    value={taskData.status}
+                    onChange={(e) => setTaskData({...taskData, status: e.target.value})}
+                    className="w-48 px-2 bg-green-100 text-green-500 rounded-md text-sm border-none focus:outline-none h-7"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in-review">In Review</option>
+                    <option value="follow-up">Follow-up</option>
+                    <option value="backlog">Backlog</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600 text-sm font-semibold">Assignee</span>
-                <select
-                  value={taskData.assigned}
-                  onChange={(e) => setTaskData({...taskData, assigned: e.target.value})}
-                  className="px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none"
-                >
-                  <option value="">Select Assignee</option>
-                  <option value="Nauman">Nauman</option>
-                  <option value="Faraz">Faraz</option>
-                  <option value="Fawad">Fawad</option>
-                  <option value="Faizan">Faizan</option>
-                </select>
-              </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 text-sm font-semibold w-20">Client</span>
+                  <select
+                    value={taskData.client}
+                    onChange={(e) => setTaskData({...taskData, client: e.target.value})}
+                    className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
+                  >
+                    <option value="">Select Client</option>
+                    {clients.map(client => (
+                      <option key={client.id} value={client.id}>
+                        {client.clientName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600 text-sm font-semibold">Due Date</span>
-                <input
-                  type="date"
-                  value={taskData.date}
-                  onChange={(e) => setTaskData({...taskData, date: e.target.value})}
-                  className="px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none"
-                />
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 text-sm font-semibold w-20">Users</span>
+                  <select
+                    value={taskData.user}
+                    onChange={(e) => setTaskData({...taskData, user: e.target.value})}
+                    className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
+                  >
+                    <option value="">Select User</option>
+                    {users.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 text-sm font-semibold w-20">Assignee</span>
+                  <select
+                    value={taskData.assigned}
+                    onChange={(e) => setTaskData({...taskData, assigned: e.target.value})}
+                    className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-7"
+                  >
+                    <option value="">Select Assignee</option>
+                    <option value="Nauman">Nauman</option>
+                    <option value="Faraz">Faraz</option>
+                    <option value="Fawad">Fawad</option>
+                    <option value="Faizan">Faizan</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 text-sm font-semibold w-20">Due Date</span>
+                  <input
+                    type="date"
+                    value={taskData.date}
+                    onChange={(e) => setTaskData({...taskData, date: e.target.value})}
+                    className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-7"
+                  />
+                </div>
               </div>
             </div>
+
             <div className="grid grid-cols-3 gap-4 border-b pb-4">
               <button
                 type="button"
@@ -190,20 +275,20 @@ const NewTask = () => {
                 <span className="bg-gray-200 px-2 rounded">{taskData.activities.length}</span>
               </button>
             </div>
-            <div className="flex p-2">
-              <button
-                type="submit"
-                className="flex-1 px-4 py-2 bg-green-100 text-green-600 ml-6 rounded-lg hover:bg-green-200 font-medium"
-              >
-                Create Task
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/dashboard')}
-                className="px-4 py-2 text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-md"
-              >
-                Cancel
-              </button>
+            <div className="flex p-2 gap-2">
+            <button
+            type="submit"
+            className="px-4 py-2 bg-green-100 text-green-600 border-2 border-green-200 rounded-lg hover:bg-green-200 font-medium"
+          >
+            {editingTask ? 'Update Task' : 'Create Task'}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="px-4 py-2 text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-md font-semibold border-2 border-gray-200"
+          >
+            Cancel
+          </button>
             </div>
           </form>
         </div>
@@ -212,7 +297,6 @@ const NewTask = () => {
         isOpen={isSubModalOpen}
         onClose={handleSubModalClose}
         onSubmit={handleCreateSubTask}
-        editSubTask={editingSubTask}
       />
 
       <CommentModal
