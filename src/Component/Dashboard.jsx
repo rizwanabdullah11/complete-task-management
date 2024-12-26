@@ -7,6 +7,7 @@ import Home from './Home';
 import Userprofile from './User/User';
 import NewTask from './Modal/newTask';
 import Clientprofile from './Client/Client';
+import ChatRoom from './Chat/chatRoom';
 
 const Dashboard = () => {
   return (
@@ -21,6 +22,7 @@ const Dashboard = () => {
             <Route path="/activities" element={<Activities />} />
             <Route path="/users" element={<Userprofile />} />
             <Route path="/clients" element={<Clientprofile />} />
+            <Route path="/chat/:taskId" element={<ChatRoom />} />
           </Routes>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { db, auth } from '../Firebase';
 import { FaRegCircle } from 'react-icons/fa';
 import { MdArrowForwardIos } from "react-icons/md";
@@ -12,13 +12,11 @@ const Users = () => {
 
   const fetchUsers = async () => {
     try {
-      const q = query(collection(db, "tasks"), where("type", "==", "user"));
-      const userSnapshot = await getDocs(q);
+      const userSnapshot = await getDocs(collection(db, "users"));
       const userList = userSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      console.log("All users:", userList);
       setUsers(userList);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -27,28 +25,16 @@ const Users = () => {
 
   const handleCreateUser = async (userData) => {
     try {
-      const emailQuery = query(collection(db, "tasks"), 
-        where("type", "==", "user"),
-        where("email", "==", userData.email)
-      );
-      const emailSnapshot = await getDocs(emailQuery);
-      
-      if (!emailSnapshot.empty) {
-        alert("This email is already registered!");
-        return;
-      }
-
-      const tasksRef = collection(db, "tasks");
+      const usersRef = collection(db, "users");
       const newUserData = {
         ...userData,
-        type: "user",
-        userId: auth.currentUser?.uid,
+        createdBy: auth.currentUser?.uid,
         createdAt: new Date().toISOString(),
-        status: 'active'
+        status: 'active',
+        user_type : "workers"
       };
 
-      const docRef = await addDoc(tasksRef, newUserData);
-      console.log("User added successfully with ID:", docRef.id);
+      await addDoc(usersRef, newUserData);
       fetchUsers();
     } catch (error) {
       console.error("Error adding user:", error);
@@ -78,6 +64,7 @@ const Users = () => {
               <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Username</th>
               <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Full Name</th>
               <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Email</th>
+              <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Password</th>
               <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/4">Contact</th>
             </tr>
           </thead>
@@ -102,6 +89,12 @@ const Users = () => {
                     {user.email}
                   </div>
                 </td>
+                <td className="p-2">
+                  <div className="text-gray-600 truncate text-xs">
+                    {user.password}
+                  </div>
+                </td>
+
                 <td className="p-2">
                   <div className="text-gray-600 truncate text-xs">
                     {user.contactNumber}

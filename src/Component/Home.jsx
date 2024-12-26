@@ -13,6 +13,7 @@ import { db, auth } from './Firebase'
 import { BsPerson } from 'react-icons/bs'
 import { CiCalendar } from "react-icons/ci"
 import { FaRegCircle } from "react-icons/fa"
+import { FiMessageSquare } from 'react'
 import { LiaFileSolid } from "react-icons/lia"
 import { MdArrowForwardIos } from "react-icons/md";
 import TaskModal from './taskModal'
@@ -363,6 +364,12 @@ const Home = () => {
                 {task.comments?.length > 0 && (
                   <div className="flex items-center gap-1 text-gray-500">
                     <LiaFileSolid className="w-5.5 h-3.5" />
+                  </div>
+                )}
+                {task.hasChat && (
+                  <div className="flex items-center gap-1 text-blue-500">
+                    <FiMessageSquare className="w-4 h-4" />
+                    <span className="text-xs">Chat</span>
                   </div>
                 )}
               </div>

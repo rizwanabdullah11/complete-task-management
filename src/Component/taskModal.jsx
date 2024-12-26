@@ -6,6 +6,7 @@ import { CiCalendar } from "react-icons/ci"
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from './Firebase';
 import { useNavigate } from 'react-router-dom';
+import { FiMessageSquare } from 'react-icons/fi';
 
 
 const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEditingTask }) => {
@@ -209,15 +210,25 @@ const selectedClient = clients.find(c => c.id === task.client);
                 ))}
               </>
             )}
-          </div>
-          <div className="flex gap-2 pt-4 border-t">
-            <button
-              onClick={() => handleCompleteTask(task.id)}
-              className="px-4 py-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 flex items-center gap-2"
-            >
-              <FiCheck className="text-lg" />
-              Complete Task
-            </button>
+            <div className="flex gap-2 border-b pb-2">
+              <button
+                onClick={() => handleCompleteTask(task.id)}
+                className="px-4 py-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 flex items-center gap-2"
+              >
+                <FiCheck className="text-lg" />
+                Complete Task
+              </button>
+              <button
+                onClick={() => {
+                  navigate(`/dashboard/chat/${task.id}`);
+                  onClose();
+                }}
+                className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 flex items-center gap-2"
+              >
+                <FiMessageSquare className="text-lg" />
+                Chat
+              </button>
+            </div>
           </div>
         </div>
       </div>
