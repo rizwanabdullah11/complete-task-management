@@ -13,7 +13,7 @@ import { db, auth } from './Firebase'
 import { BsPerson } from 'react-icons/bs'
 import { CiCalendar } from "react-icons/ci"
 import { FaRegCircle } from "react-icons/fa"
-import { FiMessageSquare } from 'react'
+import { FiMessageSquare } from "react-icons/fi";
 import { LiaFileSolid } from "react-icons/lia"
 import { MdArrowForwardIos } from "react-icons/md";
 import TaskModal from './taskModal'

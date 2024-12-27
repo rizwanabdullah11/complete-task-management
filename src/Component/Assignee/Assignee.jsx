@@ -4,7 +4,7 @@ import { db, auth } from '../Firebase';
 import { FaRegCircle } from 'react-icons/fa';
 import { MdArrowForwardIos } from "react-icons/md";
 import { BsPerson } from 'react-icons/bs';
-import CreateUserModal from './userModal';
+import CreateUserModal from './assigneeModal';
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -12,7 +12,7 @@ const Users = () => {
 
   const fetchUsers = async () => {
     try {
-      const userSnapshot = await getDocs(collection(db, "users"));
+      const userSnapshot = await getDocs(collection(db, "assignees"));
       const userList = userSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -25,7 +25,7 @@ const Users = () => {
 
   const handleCreateUser = async (userData) => {
     try {
-      const usersRef = collection(db, "users");
+      const usersRef = collection(db, "assignees");
       const newUserData = {
         ...userData,
         createdBy: auth.currentUser?.uid,
@@ -37,7 +37,7 @@ const Users = () => {
       await addDoc(usersRef, newUserData);
       fetchUsers();
     } catch (error) {
-      console.error("Error adding user:", error);
+      console.error("Error adding assignee:", error);
     }
   };
 
@@ -48,12 +48,12 @@ const Users = () => {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Users Management</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Assignees Management</h2>
         <button
           onClick={() => setIsModalOpen(true)}
           className="px-4 py-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 font-medium"
         >
-          Create User
+          Create Assignee
         </button>
       </div>
 

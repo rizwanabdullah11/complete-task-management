@@ -4,7 +4,7 @@ import Sidebar from './Sidebar';
 import Comments from './comments';
 import Activities from './activities';
 import Home from './Home';
-import Userprofile from './User/User';
+import Userprofile from './Assignee/Assignee';
 import NewTask from './Modal/newTask';
 import Clientprofile from './Client/Client';
 import ChatRoom from './Chat/chatRoom';

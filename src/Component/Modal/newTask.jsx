@@ -46,19 +46,20 @@ const NewTask = () => {
       });
     }
   }, [editingTask]);
-
   useEffect(() => {
     const fetchUsersAndClients = async () => {
       try {
-        const usersQuery = query(collection(db, "tasks"), where("type", "==", "user"));
+        // Fetch from assignees collection instead of tasks
+        const usersQuery = query(collection(db, "assignees"));
         const usersSnapshot = await getDocs(usersQuery);
         const usersList = usersSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
         setUsers(usersList);
-
-        const clientsQuery = query(collection(db, "tasks"), where("type", "==", "client"));
+  
+        // Fetch from clients collection instead of tasks
+        const clientsQuery = query(collection(db, "clients"));
         const clientsSnapshot = await getDocs(clientsQuery);
         const clientsList = clientsSnapshot.docs.map(doc => ({
           id: doc.id,
@@ -69,9 +70,35 @@ const NewTask = () => {
         console.error("Error fetching data:", error);
       }
     };
-
+  
     fetchUsersAndClients();
   }, []);
+  
+  // useEffect(() => {
+  //   const fetchUsersAndClients = async () => {
+  //     try {
+  //       const usersQuery = query(collection(db, "tasks"), where("type", "==", "user"));
+  //       const usersSnapshot = await getDocs(usersQuery);
+  //       const usersList = usersSnapshot.docs.map(doc => ({
+  //         id: doc.id,
+  //         ...doc.data()
+  //       }));
+  //       setUsers(usersList);
+
+  //       const clientsQuery = query(collection(db, "tasks"), where("type", "==", "client"));
+  //       const clientsSnapshot = await getDocs(clientsQuery);
+  //       const clientsList = clientsSnapshot.docs.map(doc => ({
+  //         id: doc.id,
+  //         ...doc.data()
+  //       }));
+  //       setClients(clientsList);
+  //     } catch (error) {
+  //       console.error("Error fetching data:", error);
+  //     }
+  //   };
+
+  //   fetchUsersAndClients();
+  // }, []);
 
   const handleSubModalClose = () => {
     setIsSubModalOpen(false);
@@ -192,7 +219,7 @@ const NewTask = () => {
 
                 <div className="flex items-center gap-2">
                   <span className="text-gray-600 text-sm font-semibold w-20">Client</span>
-                  <select
+                  {/* <select
                     value={taskData.client}
                     onChange={(e) => setTaskData({...taskData, client: e.target.value})}
                     className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
@@ -202,39 +229,51 @@ const NewTask = () => {
                       <option key={client.id} value={client.id}>
                         {client.clientName}
                       </option>
-                    ))}
-                  </select>
+))}
+                  </select> */}
+                  <select
+  value={taskData.client}
+  onChange={(e) => setTaskData({...taskData, client: e.target.value})}
+  className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
+>
+  <option value="">Select Client</option>
+  {clients.map(client => (
+    <option key={client.id} value={client.id}>
+      {client.clientName}
+    </option>
+  ))}
+</select>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-600 text-sm font-semibold w-20">Users</span>
-                  <select
-                    value={taskData.user}
-                    onChange={(e) => setTaskData({...taskData, user: e.target.value})}
-                    className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
-                  >
-                    <option value="">Select User</option>
-                    {users.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.username}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <span className="text-gray-600 text-sm font-semibold w-20">Assignees</span>
+                  {/* <select
+  value={taskData.user}
+  onChange={(e) => setTaskData({...taskData, user: e.target.value})}
+  className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
+>
+  <option value="">Select Assignee</option>
+  {users.map(user => (
+    <option key={user.id} value={user.id}>
+      {user.username}
+    </option>
+  ))}
+</select> */}
+<select
+  value={taskData.user}
+  onChange={(e) => setTaskData({...taskData, user: e.target.value})}
+  className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
+>
+  <option value="">Select Assignee</option>
+  {users.map(user => (
+    <option key={user.id} value={user.id}>
+      {user.username} {/* Display username */}
+    </option>
+  ))}
+</select>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600 text-sm font-semibold w-20">Assignee</span>
-                  <select
-                    value={taskData.assigned}
-                    onChange={(e) => setTaskData({...taskData, assigned: e.target.value})}
-                    className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-7"
-                  >
-                    <option value="">Select Assignee</option>
-                    <option value="Nauman">Nauman</option>
-                    <option value="Faraz">Faraz</option>
-                    <option value="Fawad">Fawad</option>
-                    <option value="Faizan">Faizan</option>
-                  </select>
+
+
                 </div>
 
                 <div className="flex items-center gap-2">

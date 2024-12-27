@@ -6,41 +6,64 @@ import { CiCalendar } from "react-icons/ci"
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from './Firebase';
 import { useNavigate } from 'react-router-dom';
-import { FiMessageSquare } from 'react-icons/fi';
-
 
 const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEditingTask }) => {
   const [activeTab, setActiveTab] = useState('subtasks');
   const [users, setUsers] = useState([]);
   const [clients, setClients] = useState([]);
   const navigate = useNavigate();
+  useEffect(() => {
+    const fetchUsersAndClients = async () => {
+      try {
+        const usersQuery = query(collection(db, "assignees"));
+        const usersSnapshot = await getDocs(usersQuery);
+        const usersList = usersSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setUsers(usersList);
+  
+        const clientsQuery = query(collection(db, "clients"));
+        const clientsSnapshot = await getDocs(clientsQuery);
+        const clientsList = clientsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setClients(clientsList);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+  
+    fetchUsersAndClients();
+  }, []);
+  
 
+// useEffect(() => {
+//   const fetchUsersAndClients = async () => {
+//     try {
+//       const usersQuery = query(collection(db, "tasks"), where("type", "==", "user"));
+//       const usersSnapshot = await getDocs(usersQuery);
+//       const usersList = usersSnapshot.docs.map(doc => ({
+//         id: doc.id,
+//         ...doc.data()
+//       }));
+//       setUsers(usersList);
 
-useEffect(() => {
-  const fetchUsersAndClients = async () => {
-    try {
-      const usersQuery = query(collection(db, "tasks"), where("type", "==", "user"));
-      const usersSnapshot = await getDocs(usersQuery);
-      const usersList = usersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setUsers(usersList);
+//       const clientsQuery = query(collection(db, "tasks"), where("type", "==", "client"));
+//       const clientsSnapshot = await getDocs(clientsQuery);
+//       const clientsList = clientsSnapshot.docs.map(doc => ({
+//         id: doc.id,
+//         ...doc.data()
+//       }));
+//       setClients(clientsList);
+//     } catch (error) {
+//       console.error("Error fetching data:", error);
+//     }
+//   };
 
-      const clientsQuery = query(collection(db, "tasks"), where("type", "==", "client"));
-      const clientsSnapshot = await getDocs(clientsQuery);
-      const clientsList = clientsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setClients(clientsList);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    }
-  };
-
-  fetchUsersAndClients();
-}, []);
+//   fetchUsersAndClients();
+// }, []);
 const selectedClient = clients.find(c => c.id === task.client);
   const selectedUser = users.find(u => u.id === task.user);
   if (!task) return null;
@@ -118,18 +141,10 @@ const selectedClient = clients.find(c => c.id === task.client);
             </div>
 
             <div className="flex ml-8">
-              <span className="text-gray-600 text-sm font-semibold">User</span>
+              <span className="text-gray-600 text-sm font-semibold">Assignee</span>
               <div className="px-2 ml-11 bg-gray-100 text-gray-600 rounded-md flex items-center gap-2">
                 <BsPerson className="text-gray-500 text-sm" />
                 {selectedUser?.username || 'Not Assigned'}
-              </div>
-            </div>
-
-            <div className="flex">
-              <span className="text-gray-600 text-sm font-semibold ml-8">Assignee</span>
-              <div className="px-2 ml-4 bg-gray-100 text-gray-600 rounded-md flex items-center gap-2">
-                <BsPerson className="text-gray-500 text-sm" />
-                {task.assigned || 'Unassigned'}
               </div>
             </div>
           </div>
@@ -225,7 +240,6 @@ const selectedClient = clients.find(c => c.id === task.client);
                 }}
                 className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 flex items-center gap-2"
               >
-                <FiMessageSquare className="text-lg" />
                 Chat
               </button>
             </div>
