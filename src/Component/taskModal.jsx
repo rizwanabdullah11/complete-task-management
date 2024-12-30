@@ -11,19 +11,19 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
   const [activeTab, setActiveTab] = useState('subtasks');
   const [users, setUsers] = useState([]);
   const [clients, setClients] = useState([]);
+  
   const navigate = useNavigate();
   useEffect(() => {
     const fetchUsersAndClients = async () => {
       try {
-        const usersQuery = query(collection(db, "assignees"));
+        const usersQuery = query(collection(db, "users"), where("userType", "==", "worker"));
         const usersSnapshot = await getDocs(usersQuery);
         const usersList = usersSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
         setUsers(usersList);
-  
-        const clientsQuery = query(collection(db, "clients"));
+        const clientsQuery = query(collection(db, "users"), where("userType", "==", "client"));
         const clientsSnapshot = await getDocs(clientsQuery);
         const clientsList = clientsSnapshot.docs.map(doc => ({
           id: doc.id,
@@ -38,34 +38,6 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
     fetchUsersAndClients();
   }, []);
   
-
-// useEffect(() => {
-//   const fetchUsersAndClients = async () => {
-//     try {
-//       const usersQuery = query(collection(db, "tasks"), where("type", "==", "user"));
-//       const usersSnapshot = await getDocs(usersQuery);
-//       const usersList = usersSnapshot.docs.map(doc => ({
-//         id: doc.id,
-//         ...doc.data()
-//       }));
-//       setUsers(usersList);
-
-//       const clientsQuery = query(collection(db, "tasks"), where("type", "==", "client"));
-//       const clientsSnapshot = await getDocs(clientsQuery);
-//       const clientsList = clientsSnapshot.docs.map(doc => ({
-//         id: doc.id,
-//         ...doc.data()
-//       }));
-//       setClients(clientsList);
-//     } catch (error) {
-//       console.error("Error fetching data:", error);
-//     }
-//   };
-
-//   fetchUsersAndClients();
-// }, []);
-const selectedClient = clients.find(c => c.id === task.client);
-  const selectedUser = users.find(u => u.id === task.user);
   if (!task) return null;
 
   return (
@@ -131,12 +103,11 @@ const selectedClient = clients.find(c => c.id === task.client);
                   {task.status}
                 </div>
               </div>
-
-              <div className="flex ml-8">
+            <div className="flex ml-8">
               <span className="text-gray-600 text-sm font-semibold">Client</span>
               <div className="px-2 ml-9 bg-gray-100 text-gray-600 rounded-md flex items-center gap-2">
                 <BsPerson className="text-gray-500 text-sm" />
-                {selectedClient?.clientName || 'Not Assigned'}
+                {clients.find(c => c.id === task.client)?.clientName || 'Not Assigned'}
               </div>
             </div>
 
@@ -144,9 +115,10 @@ const selectedClient = clients.find(c => c.id === task.client);
               <span className="text-gray-600 text-sm font-semibold">Assignee</span>
               <div className="px-2 ml-11 bg-gray-100 text-gray-600 rounded-md flex items-center gap-2">
                 <BsPerson className="text-gray-500 text-sm" />
-                {selectedUser?.username || 'Not Assigned'}
+                {users.find(u => u.id === task.user)?.username || 'Not Assigned'}
               </div>
             </div>
+
           </div>
 
           <div className="grid grid-cols-3 gap-4 border-b pb-4">

@@ -6,17 +6,19 @@ import { MdArrowForwardIos } from "react-icons/md";
 import { BsPerson } from 'react-icons/bs';
 import CreateUserModal from './assigneeModal';
 
-const Users = () => {
+const Assignees = () => {
   const [users, setUsers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchUsers = async () => {
     try {
-      const userSnapshot = await getDocs(collection(db, "assignees"));
-      const userList = userSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const userSnapshot = await getDocs(collection(db, "users"));
+      const userList = userSnapshot.docs
+        .filter(doc => doc.data().userType === "worker")
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
       setUsers(userList);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -25,19 +27,18 @@ const Users = () => {
 
   const handleCreateUser = async (userData) => {
     try {
-      const usersRef = collection(db, "assignees");
+      const usersRef = collection(db, "users");
       const newUserData = {
         ...userData,
-        createdBy: auth.currentUser?.uid,
-        createdAt: new Date().toISOString(),
+        clientId: auth.currentUser?.uid,
         status: 'active',
-        user_type : "workers"
+        userType: "worker"
       };
 
       await addDoc(usersRef, newUserData);
       fetchUsers();
     } catch (error) {
-      console.error("Error adding assignee:", error);
+      console.error("Error adding user:", error);
     }
   };
 
@@ -94,7 +95,6 @@ const Users = () => {
                     {user.password}
                   </div>
                 </td>
-
                 <td className="p-2">
                   <div className="text-gray-600 truncate text-xs">
                     {user.contactNumber}
@@ -115,4 +115,4 @@ const Users = () => {
   );
 };
 
-export default Users;
+export default Assignees;

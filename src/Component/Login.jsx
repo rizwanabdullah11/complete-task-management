@@ -3,13 +3,16 @@ import { FiMail, FiLock, FiArrowRight, FiEye, FiEyeOff } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from './Firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth'
+import { useDispatch } from 'react-redux';
+import { setClientData, setAssigneeData } from '../Redux/authSlice'; 
+import { signInWithEmailAndPassword } from 'firebase/auth' 
 
 const Login = ({onLoginSuccess}) => {
   const [formData, setFormData] = useState({ email: '', password: '' })
   const [errors, setErrors] = useState({})
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
+  const dispatch = useDispatch();
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -24,58 +27,68 @@ const Login = ({onLoginSuccess}) => {
       setErrors({ auth: 'Invalid credentials' })
     }
   }
-
   const handleClientLogin = async (e) => {
     e.preventDefault()
     try {
-      const clientsRef = collection(db, "clients");
-      const q = query(clientsRef, 
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, 
         where("email", "==", formData.email),
-        where("password", "==", formData.password)
+        where("password", "==", formData.password),
+        where("userType", "==", "client")
       );
       
       const querySnapshot = await getDocs(q);
-      
       if (!querySnapshot.empty) {
-        const clientData = querySnapshot.docs[0].data();
-        console.log("Client logged in:", clientData);
+        const clientDoc = querySnapshot.docs[0];
+        const clientData = {
+          id: clientDoc.id,  
+          ...clientDoc.data()
+        };
+        dispatch(setClientData(clientData));
+        console.log("ID:", clientData.id);
         onLoginSuccess();
-        navigate('/dashboard');
-      } else {
-        setErrors({ auth: 'Invalid client credentials' });
+        navigate('/dashboard/');
       }
     } catch (error) {
       console.error("Client auth error:", error);
-      setErrors({ auth: 'Login failed' });
-    }
-  };
-
-  const handleAssigneeLogin = async (e) => {
-    e.preventDefault()
-    try {
-      const assigneesRef = collection(db, "assignees");
-      const q = query(assigneesRef, 
-        where("email", "==", formData.email),
-        where("password", "==", formData.password)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        const assigneeData = querySnapshot.docs[0].data();
-        console.log("Assignee logged in:", assigneeData);
-        onLoginSuccess();
-        navigate('/dashboard');
-      } else {
-        setErrors({ auth: 'Invalid assignee credentials' });
-      }
-    } catch (error) {
-      console.error("Assignee auth error:", error);
-      setErrors({ auth: 'Login failed' });
     }
   };
   
-
+  
+  const handleAssigneeLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(
+        usersRef,
+        where("email", "==", formData.email),
+        where("password", "==", formData.password),
+        where("userType", "==", "worker")
+      );
+  
+      const querySnapshot = await getDocs(q);
+  
+      if (!querySnapshot.empty) {
+        const assigneeDoc = querySnapshot.docs[0];
+        const assigneeData = {
+          id: assigneeDoc.id,
+          ...assigneeDoc.data(),
+        };
+        dispatch(setAssigneeData(assigneeData));
+        console.log("Assignee logged in:", assigneeData);
+        onLoginSuccess();
+        navigate("/dashboard");
+      } else {
+        console.error("No matching assignee found.");
+        setErrors({ auth: "Invalid assignee credentials" });
+      }
+    } catch (error) {
+      console.error("Assignee auth error:", error);
+      setErrors({ auth: "Login failed" });
+    }
+  };
+  
+  
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="absolute inset-0 opacity-20"></div>
@@ -135,10 +148,11 @@ const Login = ({onLoginSuccess}) => {
                 onClick={(e) => {
                   handleClientLogin(e);
                 }}
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
               >
                 Login as Client
               </button>
+
               <button
                 onClick={(e) => {
                   handleAssigneeLogin(e);

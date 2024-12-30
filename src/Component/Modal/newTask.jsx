@@ -6,10 +6,13 @@ import ActivityModal from './activitiesModal';
 import { collection, addDoc, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../Firebase';
 import { FaRegCircle } from 'react-icons/fa';
+import { useSelector } from 'react-redux';
 
 const NewTask = () => {
   const navigate = useNavigate();
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
+
+    const clientData = useSelector(state => state.auth.currentUser);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [users, setUsers] = useState([]);
@@ -49,20 +52,19 @@ const NewTask = () => {
   useEffect(() => {
     const fetchUsersAndClients = async () => {
       try {
-        // Fetch from assignees collection instead of tasks
-        const usersQuery = query(collection(db, "assignees"));
+        const usersQuery = query(collection(db, "users"), where("userType", "==", "worker"));
         const usersSnapshot = await getDocs(usersQuery);
         const usersList = usersSnapshot.docs.map(doc => ({
           id: doc.id,
+          username: doc.data().username,
           ...doc.data()
         }));
         setUsers(usersList);
-  
-        // Fetch from clients collection instead of tasks
-        const clientsQuery = query(collection(db, "clients"));
+        const clientsQuery = query(collection(db, "users"), where("userType", "==", "client"));
         const clientsSnapshot = await getDocs(clientsQuery);
         const clientsList = clientsSnapshot.docs.map(doc => ({
           id: doc.id,
+          clientName: doc.data().clientName,
           ...doc.data()
         }));
         setClients(clientsList);
@@ -74,31 +76,6 @@ const NewTask = () => {
     fetchUsersAndClients();
   }, []);
   
-  // useEffect(() => {
-  //   const fetchUsersAndClients = async () => {
-  //     try {
-  //       const usersQuery = query(collection(db, "tasks"), where("type", "==", "user"));
-  //       const usersSnapshot = await getDocs(usersQuery);
-  //       const usersList = usersSnapshot.docs.map(doc => ({
-  //         id: doc.id,
-  //         ...doc.data()
-  //       }));
-  //       setUsers(usersList);
-
-  //       const clientsQuery = query(collection(db, "tasks"), where("type", "==", "client"));
-  //       const clientsSnapshot = await getDocs(clientsQuery);
-  //       const clientsList = clientsSnapshot.docs.map(doc => ({
-  //         id: doc.id,
-  //         ...doc.data()
-  //       }));
-  //       setClients(clientsList);
-  //     } catch (error) {
-  //       console.error("Error fetching data:", error);
-  //     }
-  //   };
-
-  //   fetchUsersAndClients();
-  // }, []);
 
   const handleSubModalClose = () => {
     setIsSubModalOpen(false);
@@ -144,23 +121,34 @@ const NewTask = () => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const finalTaskData = {
-        ...taskData,
+        createBy : clientData.id,
+        title: taskData.title,
+        description: taskData.description,
+        date: taskData.date,
+        status: taskData.status,
+        client: taskData.client,
+        assignee: taskData.assignee,
+        subTasks: taskData.subTasks,
+        comments: taskData.comments,
+        activities: taskData.activities,
         updatedAt: new Date().toISOString()
       };
   
-      if (editingTask) {
-        await updateDoc(doc(db, "tasks", editingTask.id), finalTaskData);
+      if (editingTask?.id) {
+        const taskRef = doc(db, "tasks", editingTask.id);
+        await updateDoc(taskRef, finalTaskData);
+        console.log("Task updated successfully");
       } else {
         await addDoc(collection(db, "tasks"), {
           ...finalTaskData,
           userId: auth.currentUser.uid,
           createdAt: new Date().toISOString()
         });
+        console.log("New task created successfully");
       }
       navigate('/dashboard');
     } catch (error) {
@@ -219,7 +207,7 @@ const NewTask = () => {
 
                 <div className="flex items-center gap-2">
                   <span className="text-gray-600 text-sm font-semibold w-20">Client</span>
-                  {/* <select
+                  <select 
                     value={taskData.client}
                     onChange={(e) => setTaskData({...taskData, client: e.target.value})}
                     className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
@@ -229,51 +217,24 @@ const NewTask = () => {
                       <option key={client.id} value={client.id}>
                         {client.clientName}
                       </option>
-))}
-                  </select> */}
-                  <select
-  value={taskData.client}
-  onChange={(e) => setTaskData({...taskData, client: e.target.value})}
-  className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
->
-  <option value="">Select Client</option>
-  {clients.map(client => (
-    <option key={client.id} value={client.id}>
-      {client.clientName}
-    </option>
-  ))}
-</select>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <span className="text-gray-600 text-sm font-semibold w-20">Assignees</span>
-                  {/* <select
-  value={taskData.user}
-  onChange={(e) => setTaskData({...taskData, user: e.target.value})}
-  className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
->
-  <option value="">Select Assignee</option>
-  {users.map(user => (
-    <option key={user.id} value={user.id}>
-      {user.username}
-    </option>
-  ))}
-</select> */}
-<select
-  value={taskData.user}
-  onChange={(e) => setTaskData({...taskData, user: e.target.value})}
-  className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
->
-  <option value="">Select Assignee</option>
-  {users.map(user => (
-    <option key={user.id} value={user.id}>
-      {user.username} {/* Display username */}
-    </option>
-  ))}
-</select>
-
-
-
+                    <select
+                      value={taskData.user}
+                      onChange={(e) => setTaskData({...taskData, assignee: e.target.value})}
+                      className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
+                    >
+                    <option value="">Select Assignee</option>
+                    {users.map(assignee => (
+                      <option key={assignee.id} value={assignee.id}>
+                        {assignee.username}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="flex items-center gap-2">

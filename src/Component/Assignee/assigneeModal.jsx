@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 
-const UserModal = ({ isOpen, onClose, onSubmit }) => {
+const AssigneeModal = ({ isOpen, onClose, onSubmit }) => {
   const [newUser, setNewUser] = useState({
     username: '',
     fullName: '',
     email: '',
     contactNumber: '',
     password: '',
-    type: 'worker'
   });
 
   const handleSubmit = (e) => {
@@ -19,7 +18,6 @@ const UserModal = ({ isOpen, onClose, onSubmit }) => {
       email: '',
       contactNumber: '',
       password: '',
-      type: 'worker'
     });
     onClose();
   };
@@ -103,4 +101,4 @@ const UserModal = ({ isOpen, onClose, onSubmit }) => {
   );
 };
 
-export default UserModal;
+export default AssigneeModal;

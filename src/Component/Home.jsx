@@ -17,9 +17,11 @@ import { FiMessageSquare } from "react-icons/fi";
 import { LiaFileSolid } from "react-icons/lia"
 import { MdArrowForwardIos } from "react-icons/md";
 import TaskModal from './taskModal'
+import { useSelector } from 'react-redux'
 
 const Home = () => {
-  const [tasks, setTasks] = useState([])
+  const [tasks, setTasks] = useState([]);
+  const userType = useSelector(state => state.auth.userType);
   const [editingTask, setEditingTask] = useState(null)
   const [viewType, setViewType] = useState('board')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -84,32 +86,65 @@ const Home = () => {
       </div>
     )
   }
-  useEffect(() => {
-    const variable = auth.onAuthStateChanged((user) => {
-      if (user) {
-        fetchTasks(user.uid)
-      }
-    })
-    return () => variable()
-  }, [])
 
-  const fetchTasks = async (userId) => {
-    try {
-      const q = query(collection(db, "tasks"), where("userId", "==", userId))
-      const querySnapshot = await getDocs(q)
-      const tasksList = await Promise.all(querySnapshot.docs.map(async (doc) => {
-        const data = { id: doc.id, ...doc.data() }
-        if (data.type !== "user_data") {
-          return data
+  // useEffect(() => {
+  //   const fetchTasks = async () => {
+  //     const tasksSnapshot = await getDocs(collection(db, "tasks"));
+  //     const tasksList = tasksSnapshot.docs.map(doc => ({
+  //       id: doc.id,
+  //       ...doc.data()
+  //     }));
+  //     console.log("All Tasks:", tasksList);
+  //     setTasks(tasksList);
+  //   };
+
+  //   fetchTasks();
+  // }, []);
+  const clientData = useSelector(state => state.auth.currentUser);
+  const assigneeData = useSelector(state => state.auth.currentUser);
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      console.log("Logged in user data:", clientData);
+      if (!clientData?.id) return;
+      try {
+        let tasksQuery;
+        if (clientData?.userType === "client") {
+          // console.log("3333333333");
+          tasksQuery = query(
+            collection(db, "tasks"),
+            where("client", "==", clientData.id)
+          );
+        } else if (assigneeData?.userType === "worker") {
+          // console.log("4444444444444");
+
+          tasksQuery = query(
+            collection(db, "tasks"),
+            where("assignee", "==", assigneeData.id)
+          );
+        } else {
+          console.log("Unknown user type:");
+          return;
         }
-        return null
-      }))
-      setTasks(tasksList.filter(task => task !== null))
-    } catch (error) {
-      console.log("Error fetching tasks:", error)
-    }
-  }
+
+        const querySnapshot = await getDocs(tasksQuery);
+
+        const tasksList = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        console.log("Fetched Tasks:", tasksList);
+        setTasks(tasksList);
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+      }
+    };
+
+    fetchTasks();
+  }, [clientData, assigneeData]);
   
+
   const handleCreateTask = async (taskData) => {
     try {
       const newTask = {
