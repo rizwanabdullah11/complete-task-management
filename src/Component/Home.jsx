@@ -122,6 +122,7 @@ const Home = () => {
             collection(db, "tasks"),
             where("assignee", "==", assigneeData.id)
           );
+
         } else {
           console.log("Unknown user type:");
           return;

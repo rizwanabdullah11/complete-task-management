@@ -5,13 +5,18 @@ import { doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from 'firebase
 import { FiSend } from 'react-icons/fi';
 import { BsPerson } from 'react-icons/bs';
 import { FaArrowLeft } from 'react-icons/fa';
+import { IoCallOutline } from 'react-icons/io5';
+import { useSelector } from 'react-redux';
 
 const ChatRoom = () => {
   const { taskId } = useParams();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [user, setUser] = useState('Client');
+  const [taskTitle, setTaskTitle] = useState('');
+  const [otherUserId, setOtherUserId] = useState(null);
+  const [task, setTask] = useState(null);
+  const user = useSelector(state => state.auth.currentUser);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -22,14 +27,24 @@ const ChatRoom = () => {
     const chatRef = doc(db, 'taskChats', taskId);
     
     const initializeChat = async () => {
-      const chatDoc = await getDoc(chatRef);
-      if (!chatDoc.exists()) {
-        await setDoc(chatRef, {
-          messages: [],
-          participants: ['Client', 'Assignee'],
-          taskId: taskId,
-          createdAt: new Date().toISOString()
-        });
+      const getTaskRef = doc(db, 'tasks', taskId);
+      const getTask = await getDoc(getTaskRef);
+
+      if(getTask.data()) {
+        setTask(getTask.data());
+        setTaskTitle(getTask.data().title);
+        const definetheser = getTask.data()?.client === user.userId ? getTask.data()?.assignee : getTask.data()?.client;
+        setOtherUserId(definetheser);
+
+        const chatDoc = await getDoc(chatRef);
+        if (!chatDoc.exists()) {
+          await setDoc(chatRef, {
+            messages: [],
+            participants: [user.userId, definetheser],
+            taskId: taskId,
+            createdAt: new Date().toISOString()
+          });
+        }
       }
     };
 
@@ -57,7 +72,7 @@ const ChatRoom = () => {
       
       const messageData = {
         text: newMessage,
-        sender: user,
+        sender: user.userId,
         timestamp: new Date().toISOString(),
         id: Date.now().toString()
       };
@@ -70,8 +85,9 @@ const ChatRoom = () => {
     }
   };
 
-  const toggleUser = () => {
-    setUser(user === 'Client' ? 'Assignee' : 'Client');
+  const startCall = () => {
+    const otherUserId = task?.client === user.userId ? task?.assignee : task?.client;
+    navigate(`/call/${taskId}/${otherUserId}`);
   };
 
   return (
@@ -91,24 +107,25 @@ const ChatRoom = () => {
                   <BsPerson className="text-gray-600 text-xl" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-gray-800">Task Chat</h2>
-                  <p className="text-xs text-gray-500">{user === 'Client' ? 'Assignee' : 'Client'}</p>
+                  <h2 className="font-semibold text-gray-800">{taskTitle || 'Task Chat'}</h2>
+                  <span className="text-xs text-gray-500">
+                    Chatting with {user.userType === 'client' ? 'Assignee' : 'Client'}
+                  </span>
                 </div>
               </div>
             </div>
-            <button 
-              onClick={toggleUser} 
-              className="px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100 flex items-center gap-2"
+            <button
+              onClick={startCall}
+              className="p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200"
             >
-              <BsPerson className="text-lg" />
-              {user}
+              <IoCallOutline className="text-xl" />
             </button>
           </div>
         </div>
 
         <div className="flex-1 bg-gray-50 overflow-y-auto p-4 space-y-4">
           {messages.map((message) => (
-            <div key={message.id} className={`flex gap-3 ${message.sender === user ? 'flex-row-reverse' : ''}`}>
+            <div key={message.id} className={`flex gap-3 ${message.sender === user.userId ? 'flex-row-reverse' : ''}`}>
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
                   <BsPerson className="text-gray-600 text-lg" />
@@ -116,7 +133,7 @@ const ChatRoom = () => {
               </div>
               <div className={`flex-1 ${message.sender === user ? 'text-right' : ''}`}>
                 <div className={`inline-block max-w-[70%] p-3 rounded-lg ${
-                  message.sender === user 
+                  message.sender === user.userId 
                     ? 'bg-green-500 text-white' 
                     : 'bg-white text-gray-800'
                 }`}>

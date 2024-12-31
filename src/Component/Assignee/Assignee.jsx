@@ -30,11 +30,10 @@ const Assignees = () => {
       const usersRef = collection(db, "users");
       const newUserData = {
         ...userData,
-        clientId: auth.currentUser?.uid,
+        userId: auth.currentUser?.uid, // Add userId
         status: 'active',
         userType: "worker"
       };
-
       await addDoc(usersRef, newUserData);
       fetchUsers();
     } catch (error) {

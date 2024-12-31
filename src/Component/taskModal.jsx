@@ -11,17 +11,30 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
   const [activeTab, setActiveTab] = useState('subtasks');
   const [users, setUsers] = useState([]);
   const [clients, setClients] = useState([]);
-  
   const navigate = useNavigate();
+  const getAssigneeName = () => {
+    const assignee = users.find(user => user.userId === task.assigneeId);
+    return assignee ? assignee.username : 'Not Assigned';
+  };
+  
+  const getClientName = () => {
+    const client = clients.find(client => client.userId === task.clientId);
+    return client ? client.clientName : 'Not Assigned';
+  };
   useEffect(() => {
+    
     const fetchUsersAndClients = async () => {
+      console.log(task, '00000000')
       try {
+        
         const usersQuery = query(collection(db, "users"), where("userType", "==", "worker"));
         const usersSnapshot = await getDocs(usersQuery);
         const usersList = usersSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
+
+        console.log(usersList,"uselist")
         setUsers(usersList);
         const clientsQuery = query(collection(db, "users"), where("userType", "==", "client"));
         const clientsSnapshot = await getDocs(clientsQuery);
@@ -96,18 +109,11 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
           </div>
 
           <div className="space-y-2">
-              <div className="flex ml-8">
-                <span className="text-gray-600 text-sm font-semibold">Status</span>
-                <div className="px-2 ml-8 bg-green-100 text-green-500 rounded-md flex items-center gap-2">
-                  <FaRegCircle className="text-green-500 w-3 h-3 flex-shrink-0" />
-                  {task.status}
-                </div>
-              </div>
             <div className="flex ml-8">
               <span className="text-gray-600 text-sm font-semibold">Client</span>
               <div className="px-2 ml-9 bg-gray-100 text-gray-600 rounded-md flex items-center gap-2">
                 <BsPerson className="text-gray-500 text-sm" />
-                {clients.find(c => c.id === task.client)?.clientName || 'Not Assigned'}
+                {getClientName()}
               </div>
             </div>
 
@@ -115,7 +121,7 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
               <span className="text-gray-600 text-sm font-semibold">Assignee</span>
               <div className="px-2 ml-11 bg-gray-100 text-gray-600 rounded-md flex items-center gap-2">
                 <BsPerson className="text-gray-500 text-sm" />
-                {users.find(u => u.id === task.user)?.username || 'Not Assigned'}
+                {getAssigneeName()}
               </div>
             </div>
 

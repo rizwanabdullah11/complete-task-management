@@ -26,7 +26,7 @@ const NewTask = () => {
     assigned: editingTask?.assigned || '',
     status: editingTask?.status || 'pending',
     client: editingTask?.client || '',
-    user: editingTask?.user || '',
+    assignee: editingTask?.assignee || '',
     subTasks: editingTask?.subTasks || [],
     comments: editingTask?.comments || [],
     activities: editingTask?.activities || []
@@ -42,7 +42,7 @@ const NewTask = () => {
         assigned: editingTask.assigned || '',
         status: editingTask.status || 'pending',
         client: editingTask.client || '',
-        user: editingTask.user || '',
+        assignee: editingTask.assignee || '',
         subTasks: editingTask.subTasks || [],
         comments: editingTask.comments || [],
         activities: editingTask.activities || []
@@ -224,7 +224,7 @@ const NewTask = () => {
                 <div className="flex items-center gap-2">
                   <span className="text-gray-600 text-sm font-semibold w-20">Assignees</span>
                     <select
-                      value={taskData.user}
+                      value={taskData.assignee}
                       onChange={(e) => setTaskData({...taskData, assignee: e.target.value})}
                       className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
                     >

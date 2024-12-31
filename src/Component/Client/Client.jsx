@@ -30,11 +30,10 @@ const Clients = () => {
       const usersRef = collection(db, "users");
       const newClientData = {
         ...clientData,
-        Id: auth.currentUser?.uid,
+        userId: auth.currentUser?.uid, // Add userId
         status: 'active',
         userType: "client"
       };
-
       await addDoc(usersRef, newClientData);
       fetchClients();
     } catch (error) {
