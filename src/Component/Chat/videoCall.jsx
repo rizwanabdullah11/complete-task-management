@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Peer from 'simple-peer';
-import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, limit } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, doc, getDoc, getDocs, updateDoc, limit } from 'firebase/firestore';
 import { db } from '../Firebase';
 import { PhoneIcon, PhoneXMarkIcon } from '@heroicons/react/24/solid';
 
@@ -104,27 +104,52 @@ const VideoCall = () => {
 
   const verifyAndJoinCall = async (code) => {
     console.log('🔍 Verifying call code:', code);
-    const activeCallQuery = query(
-      collection(db, 'activeCalls'),
-      where('code', '==', code),
-      where('status', '==', 'pending')
-    );
-    
-    const snapshot = await getDocs(activeCallQuery);
-    if (!snapshot.empty) {
-      const callData = snapshot.docs[0].data();
-      return callData.initiator !== currentUser.userId;
+    try {
+      // Get task details first
+      const taskRef = doc(db, 'tasks', taskId);
+      const taskDoc = await getDoc(taskRef);
+      const taskData = taskDoc.data();
+  
+      // Check active calls
+      const activeCallQuery = query(
+        collection(db, 'activeCalls'),
+        where('code', '==', code),
+        where('status', '==', 'pending')
+      );
+      
+      const snapshot = await getDocs(activeCallQuery);
+      if (!snapshot.empty) {
+        const callData = snapshot.docs[0].data();
+        
+        // Verify user is either client or assignee of the task
+        if (taskData.client === currentUser.id || taskData.assignee === currentUser.id) {
+          console.log('✅ Call verified successfully');
+          return true;
+        } else {
+          setCallStatus('Not authorized to join this call');
+          return false;
+        }
+      }
+      
+      setCallStatus('Call not found or ended');
+      return false;
+    } catch (error) {
+      console.error('Error verifying call:', error);
+      setCallStatus('Verification failed');
+      return false;
     }
-    setCallStatus('Invalid call code');
-    return false;
   };
+  
+  
+  
+  
 
   const joinCall = async () => {
-    if (!await verifyAndJoinCall(connectionCode)) {
+    const isValid = await verifyAndJoinCall(connectionCode);
+    if (!isValid) {
       console.log('❌ Invalid call code or verification failed');
       return;
     }
-
     try {
       await releaseMediaDevices();
       console.log('🎥 Requesting media permissions for joining...');
