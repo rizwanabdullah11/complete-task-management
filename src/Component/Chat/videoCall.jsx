@@ -2,9 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Peer from 'simple-peer';
-import { collection, addDoc, onSnapshot, query, where, doc, getDoc, getDocs, updateDoc, limit } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../Firebase';
 import { PhoneIcon, PhoneXMarkIcon } from '@heroicons/react/24/solid';
+import { Buffer } from 'buffer';
+window.Buffer = Buffer;
+window.process = require('process/browser');
 
 const VideoCall = () => {
   const { taskId } = useParams();
@@ -18,14 +21,29 @@ const VideoCall = () => {
   const [isInitiator, setIsInitiator] = useState(false);
   const [callStatus, setCallStatus] = useState('');
   const [showCodeInput, setShowCodeInput] = useState(true);
+  const [callDuration, setCallDuration] = useState(0);
   const myVideo = useRef();
   const remoteVideo = useRef();
   const connectionRef = useRef();
+  const timerRef = useRef();
+
+  const startTimer = () => {
+    timerRef.current = setInterval(() => {
+      setCallDuration(prev => prev + 1);
+    }, 1000);
+  };
+
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const releaseMediaDevices = () => {
     if (stream) {
       stream.getTracks().forEach(track => {
         track.stop();
+        stream.removeTrack(track);
       });
     }
   };
@@ -84,6 +102,7 @@ const VideoCall = () => {
       newPeer.on('connect', () => {
         console.log('🤝 Peer connection established as initiator');
         setCallStatus('Connected');
+        startTimer();
       });
 
       newPeer.on('stream', (remoteStream) => {
@@ -105,12 +124,10 @@ const VideoCall = () => {
   const verifyAndJoinCall = async (code) => {
     console.log('🔍 Verifying call code:', code);
     try {
-      // Get task details first
       const taskRef = doc(db, 'tasks', taskId);
       const taskDoc = await getDoc(taskRef);
       const taskData = taskDoc.data();
-  
-      // Check active calls
+
       const activeCallQuery = query(
         collection(db, 'activeCalls'),
         where('code', '==', code),
@@ -121,35 +138,25 @@ const VideoCall = () => {
       if (!snapshot.empty) {
         const callData = snapshot.docs[0].data();
         
-        // Verify user is either client or assignee of the task
         if (taskData.client === currentUser.id || taskData.assignee === currentUser.id) {
           console.log('✅ Call verified successfully');
           return true;
-        } else {
-          setCallStatus('Not authorized to join this call');
-          return false;
         }
       }
       
-      setCallStatus('Call not found or ended');
+      setCallStatus('Invalid call code or verification failed');
       return false;
     } catch (error) {
-      console.error('Error verifying call:', error);
-      setCallStatus('Verification failed');
+      console.error('Error in verification:', error);
       return false;
     }
   };
-  
-  
-  
-  
 
   const joinCall = async () => {
-    const isValid = await verifyAndJoinCall(connectionCode);
-    if (!isValid) {
-      console.log('❌ Invalid call code or verification failed');
+    if (!await verifyAndJoinCall(connectionCode)) {
       return;
     }
+
     try {
       await releaseMediaDevices();
       console.log('🎥 Requesting media permissions for joining...');
@@ -200,6 +207,7 @@ const VideoCall = () => {
         newPeer.on('connect', () => {
           console.log('🤝 Peer connection established as joiner');
           setCallStatus('Connected');
+          startTimer();
         });
 
         newPeer.on('stream', (remoteStream) => {
@@ -247,6 +255,9 @@ const VideoCall = () => {
 
   useEffect(() => {
     return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
       releaseMediaDevices();
     };
   }, []);
@@ -266,33 +277,49 @@ const VideoCall = () => {
   };
 
   const endCall = async () => {
-    console.log('📴 Ending call');
-    releaseMediaDevices();
-    connectionRef.current?.destroy();
+    try {
+      console.log('📴 Ending call');
+      
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
 
-    const code = callCode || connectionCode;
-    const activeCallQuery = query(
-      collection(db, 'activeCalls'),
-      where('code', '==', code)
-    );
+      releaseMediaDevices();
+      connectionRef.current?.destroy();
 
-    const snapshot = await getDocs(activeCallQuery);
-    snapshot.forEach(async (doc) => {
-      await updateDoc(doc.ref, { status: 'ended' });
-    });
+      const code = callCode || connectionCode;
+      const activeCallQuery = query(
+        collection(db, 'activeCalls'),
+        where('code', '==', code)
+      );
 
-    setIsCallActive(false);
-    setStream(null);
-    setPeer(null);
-    setCallCode('');
-    setConnectionCode('');
-    setIsInitiator(false);
-    setCallStatus('');
-    if (myVideo.current) myVideo.current.srcObject = null;
-    if (remoteVideo.current) remoteVideo.current.srcObject = null;
-    
-    navigate(`/dashboard/chat/${taskId}`);
-    console.log('✅ Call ended successfully');
+      const snapshot = await getDocs(activeCallQuery);
+      await Promise.all(
+        snapshot.docs.map(doc => 
+          updateDoc(doc.ref, { 
+            status: 'ended',
+            endedAt: new Date().toISOString()
+          })
+        )
+      );
+
+      setIsCallActive(false);
+      setStream(null);
+      setPeer(null);
+      setCallCode('');
+      setConnectionCode('');
+      setIsInitiator(false);
+      setCallStatus('');
+      setCallDuration(0);
+      
+      if (myVideo.current) myVideo.current.srcObject = null;
+      if (remoteVideo.current) remoteVideo.current.srcObject = null;
+      
+      navigate(`/dashboard/chat/${taskId}`);
+      console.log('✅ Call ended successfully');
+    } catch (error) {
+      console.error('Error ending call:', error);
+    }
   };
 
   return (
@@ -366,6 +393,12 @@ const VideoCall = () => {
           {callStatus && (
             <div className={`text-sm mb-4 ${callStatus === 'Connected' ? 'text-green-500' : 'text-red-500'}`}>
               {callStatus}
+            </div>
+          )}
+
+          {isCallActive && (
+            <div className="text-white text-center mb-4">
+              Call Duration: {formatDuration(callDuration)}
             </div>
           )}
 
