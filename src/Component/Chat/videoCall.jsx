@@ -1,8 +1,9 @@
+// At the top with imports
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Peer from 'simple-peer';
-import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, limit } from 'firebase/firestore';
 import { db } from '../Firebase';
 import { PhoneIcon, PhoneXMarkIcon } from '@heroicons/react/24/solid';
 import { Buffer } from 'buffer';
@@ -20,18 +21,18 @@ const VideoCall = () => {
   const [connectionCode, setConnectionCode] = useState('');
   const [isInitiator, setIsInitiator] = useState(false);
   const [callStatus, setCallStatus] = useState('');
-  const [showCodeInput, setShowCodeInput] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
-  const [remoteStream, setRemoteStream] = useState(null);
   const myVideo = useRef();
   const remoteVideo = useRef();
   const connectionRef = useRef();
   const timerRef = useRef();
 
   const startTimer = () => {
-    timerRef.current = setInterval(() => {
-      setCallDuration(prev => prev + 1);
-    }, 1000);
+    if (!timerRef.current) {
+      timerRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    }
   };
 
   const formatDuration = (seconds) => {
@@ -40,30 +41,27 @@ const VideoCall = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Update the handleRemoteStream function
-const handleRemoteStream = (stream) => {
-  console.log('Remote stream received:', stream);
-  if (remoteVideo.current) {
-    remoteVideo.current.srcObject = stream;
-    remoteVideo.current.play().catch(err => console.log('Play error:', err));
-  }
-  setIsCallActive(true);
-  setCallStatus('Connected');
-  startTimer();
-};
-
+  const handleRemoteStream = (remoteStream) => {
+    console.log('📡 Remote stream connected');
+    if (remoteVideo.current) {
+      remoteVideo.current.srcObject = remoteStream;
+      remoteVideo.current.play().catch(err => console.log('Remote video play error:', err));
+    }
+    setIsCallActive(true);
+    setCallStatus('Connected');
+    startTimer();
+  };
 
   const startCall = async () => {
-    if (!timerRef.current) {
-      startTimer();
-    }
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: true, 
         audio: true 
       });
       setStream(mediaStream);
-      myVideo.current.srcObject = mediaStream;
+      if (myVideo.current) {
+        myVideo.current.srcObject = mediaStream;
+      }
 
       const newPeer = new Peer({
         initiator: true,
@@ -72,12 +70,7 @@ const handleRemoteStream = (stream) => {
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' },
-            {
-              urls: 'turn:numb.viagenie.ca',
-              username: 'webrtc@live.com',
-              credential: 'muazkh'
-            }
+            { urls: 'stun:global.stun.twilio.com:3478' }
           ]
         }
       });
@@ -104,9 +97,10 @@ const handleRemoteStream = (stream) => {
       });
 
       newPeer.on('stream', handleRemoteStream);
-      newPeer.on('connect', () => setCallStatus('Connected'));
-      newPeer.on('error', (err) => console.error('Peer error:', err));
-      newPeer.on('close', () => endCall());
+      newPeer.on('connect', () => {
+        console.log('🤝 Peer connection established');
+        setCallStatus('Connected');
+      });
 
       setPeer(newPeer);
       connectionRef.current = newPeer;
@@ -118,16 +112,15 @@ const handleRemoteStream = (stream) => {
   };
 
   const joinCall = async () => {
-    if (!timerRef.current) {
-      startTimer();
-    }
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: true, 
         audio: true 
       });
       setStream(mediaStream);
-      myVideo.current.srcObject = mediaStream;
+      if (myVideo.current) {
+        myVideo.current.srcObject = mediaStream;
+      }
 
       const offerQuery = query(
         collection(db, 'calls'),
@@ -147,12 +140,7 @@ const handleRemoteStream = (stream) => {
           config: {
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:global.stun.twilio.com:3478' },
-              {
-                urls: 'turn:numb.viagenie.ca',
-                username: 'webrtc@live.com',
-                credential: 'muazkh'
-              }
+              { urls: 'stun:global.stun.twilio.com:3478' }
             ]
           }
         });
@@ -169,9 +157,10 @@ const handleRemoteStream = (stream) => {
         });
 
         newPeer.on('stream', handleRemoteStream);
-        newPeer.on('connect', () => setCallStatus('Connected'));
-        newPeer.on('error', (err) => console.error('Peer error:', err));
-        newPeer.on('close', () => endCall());
+        newPeer.on('connect', () => {
+          console.log('🤝 Peer connection established');
+          setCallStatus('Connected');
+        });
 
         newPeer.signal(offerData.signalData);
         setPeer(newPeer);
@@ -209,10 +198,9 @@ const handleRemoteStream = (stream) => {
 
   const endCall = async () => {
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-    }
-    if (remoteStream) {
-      remoteStream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(track => {
+        track.stop();
+      });
     }
     if (connectionRef.current) {
       connectionRef.current.destroy();
@@ -230,24 +218,20 @@ const handleRemoteStream = (stream) => {
       const snapshot = await getDocs(activeCallQuery);
       await Promise.all(
         snapshot.docs.map(doc => 
-          updateDoc(doc.ref, { 
-            status: 'ended',
-            endedAt: new Date().toISOString()
-          })
+          updateDoc(doc.ref, { status: 'ended' })
         )
       );
     }
 
     setIsCallActive(false);
     setStream(null);
-    setRemoteStream(null);
     setPeer(null);
     setCallCode('');
     setConnectionCode('');
     setIsInitiator(false);
     setCallStatus('');
     setCallDuration(0);
-
+    
     if (myVideo.current) myVideo.current.srcObject = null;
     if (remoteVideo.current) remoteVideo.current.srcObject = null;
 
@@ -256,7 +240,12 @@ const handleRemoteStream = (stream) => {
 
   useEffect(() => {
     return () => {
-      endCall();
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
     };
   }, []);
 
@@ -295,51 +284,51 @@ const handleRemoteStream = (stream) => {
           </div>
         )}
 
-        {isCallActive && (
+        {callDuration > 0 && (
           <div className="text-white">
             Duration: {formatDuration(callDuration)}
           </div>
         )}
 
-// Update the return JSX for the buttons section
-<div className="flex gap-4">
-  {!isCallActive && !isInitiator && (
-    <div className="flex gap-2">
-      <input
-        type="text"
-        value={connectionCode}
-        onChange={(e) => setConnectionCode(e.target.value)}
-        placeholder="Enter call code"
-        className="px-4 py-2 rounded-lg border"
-      />
-      <button
-        onClick={joinCall}
-        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
-      >
-        Join Call
-      </button>
-    </div>
-  )}
-  {!isCallActive && !connectionCode && (
-    <button
-      onClick={startCall}
-      className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
-    >
-      <PhoneIcon className="h-5 w-5" />
-      Start Call
-    </button>
-  )}
-  {isCallActive && (
-    <button
-      onClick={endCall}
-      className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
-    >
-      <PhoneXMarkIcon className="h-5 w-5" />
-      End Call
-    </button>
-  )}
-</div>
+        <div className="flex gap-4">
+          {!isCallActive && (
+            <>
+              <button
+                onClick={startCall}
+                className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+              >
+                <PhoneIcon className="h-5 w-5" />
+                Start Call
+              </button>
 
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={connectionCode}
+                  onChange={(e) => setConnectionCode(e.target.value)}
+                  placeholder="Enter call code"
+                  className="px-4 py-2 rounded-lg border"
+                />
+                <button
+                  onClick={joinCall}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
+                >
+                  Join Call
+                </button>
+              </div>
+            </>
+          )}
+
+          {isCallActive && (
+            <button
+              onClick={endCall}
+              className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+            >
+              <PhoneXMarkIcon className="h-5 w-5" />
+              End Call
+            </button>
+          )}
+        </div>
 
         {callCode && isInitiator && (
           <div className="mt-4 bg-white p-4 rounded-lg">
