@@ -85,10 +85,50 @@ const ChatRoom = () => {
     }
   };
 
+  // const startCall = async () => {
+  //   console.log('Starting call...');
+    
+  //   const otherUserId = task?.client === user.userId ? task?.assignee : task?.client;
+    
+  //   if (otherUserId && user) {
+  //     // Create a new call document
+  //     const callData = {
+  //       callId: Date.now().toString(),
+  //       caller: {
+  //         id: user.userId,
+  //         name: user.name || 'Unknown User',
+  //         type: user.userType
+  //       },
+  //       receiver: {
+  //         id: otherUserId
+  //       },
+  //       taskId: taskId,
+  //       taskTitle: task.title,
+  //       status: 'initiating',
+  //       timestamp: new Date().toISOString(),
+  //       participants: [user.userId, otherUserId]
+  //     };
+  
+  //     // Create call notification
+  //     await setDoc(doc(db, 'calls', callData.callId), callData);
+      
+  //     // Create notification for receiver
+  //     await setDoc(doc(db, 'callNotifications', otherUserId), {
+  //       ...callData,
+  //       status: 'incoming'
+  //     });
+  
+  //     navigate(`/call/${taskId}/${otherUserId}`);
+  //   }
+  // };
+  // Add call status tracking
   const startCall = () => {
-    const otherUserId = task?.client === user.userId ? task?.assignee : task?.client;
     navigate(`/call/${taskId}/${otherUserId}`);
   };
+  
+
+  
+  
 
   return (
     <div className="p-4 bg-gray-50 h-screen">

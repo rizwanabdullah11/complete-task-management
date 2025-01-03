@@ -3,13 +3,15 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from '../Component/Login';
 import Dashboard from '../Component/Dashboard';
 import ChatRoom from '../Component/Chat/chatRoom';
-import AudioCall from '../Component/Chat/audioCall';
+import AudioCall from '../Component/Chat/videoCall';
+
 
 const AppRouter = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   return (
-    <BrowserRouter>
+   
+ 
       <Routes>
         <Route 
           path="/" 
@@ -22,7 +24,7 @@ const AppRouter = () => {
         <Route path="/dashboard/chat/:taskId" element={<ChatRoom />} />
         <Route path="/call/:taskId/:userId" element={<AudioCall />} />
       </Routes>
-    </BrowserRouter>
+  
   );
 };
 
