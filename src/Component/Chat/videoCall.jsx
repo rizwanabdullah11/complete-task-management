@@ -40,17 +40,23 @@ const VideoCall = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleRemoteStream = (stream) => {
-    setRemoteStream(stream);
-    if (remoteVideo.current) {
-      remoteVideo.current.srcObject = stream;
-    }
-    setIsCallActive(true);
-    setCallStatus('Connected');
-    startTimer();
-  };
+  // Update the handleRemoteStream function
+const handleRemoteStream = (stream) => {
+  console.log('Remote stream received:', stream);
+  if (remoteVideo.current) {
+    remoteVideo.current.srcObject = stream;
+    remoteVideo.current.play().catch(err => console.log('Play error:', err));
+  }
+  setIsCallActive(true);
+  setCallStatus('Connected');
+  startTimer();
+};
+
 
   const startCall = async () => {
+    if (!timerRef.current) {
+      startTimer();
+    }
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: true, 
@@ -112,6 +118,9 @@ const VideoCall = () => {
   };
 
   const joinCall = async () => {
+    if (!timerRef.current) {
+      startTimer();
+    }
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: true, 
@@ -292,43 +301,45 @@ const VideoCall = () => {
           </div>
         )}
 
-        <div className="flex gap-4">
-          {!isCallActive ? (
-            <>
-              <button
-                onClick={startCall}
-                className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
-              >
-                <PhoneIcon className="h-5 w-5" />
-                Start Call
-              </button>
+// Update the return JSX for the buttons section
+<div className="flex gap-4">
+  {!isCallActive && !isInitiator && (
+    <div className="flex gap-2">
+      <input
+        type="text"
+        value={connectionCode}
+        onChange={(e) => setConnectionCode(e.target.value)}
+        placeholder="Enter call code"
+        className="px-4 py-2 rounded-lg border"
+      />
+      <button
+        onClick={joinCall}
+        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
+      >
+        Join Call
+      </button>
+    </div>
+  )}
+  {!isCallActive && !connectionCode && (
+    <button
+      onClick={startCall}
+      className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+    >
+      <PhoneIcon className="h-5 w-5" />
+      Start Call
+    </button>
+  )}
+  {isCallActive && (
+    <button
+      onClick={endCall}
+      className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+    >
+      <PhoneXMarkIcon className="h-5 w-5" />
+      End Call
+    </button>
+  )}
+</div>
 
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={connectionCode}
-                  onChange={(e) => setConnectionCode(e.target.value)}
-                  placeholder="Enter call code"
-                  className="px-4 py-2 rounded-lg border"
-                />
-                <button
-                  onClick={joinCall}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
-                >
-                  Join Call
-                </button>
-              </div>
-            </>
-          ) : (
-            <button
-              onClick={endCall}
-              className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
-            >
-              <PhoneXMarkIcon className="h-5 w-5" />
-              End Call
-            </button>
-          )}
-        </div>
 
         {callCode && isInitiator && (
           <div className="mt-4 bg-white p-4 rounded-lg">
