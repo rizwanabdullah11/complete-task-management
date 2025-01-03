@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Peer from 'simple-peer';
-import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query,orderBy, where, getDocs, updateDoc, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../Firebase';
 import { PhoneIcon, PhoneXMarkIcon } from '@heroicons/react/24/solid';
 import { Buffer } from 'buffer';
