@@ -152,82 +152,79 @@ const VideoCall = () => {
     }
   };
 
-  const joinCall = async () => {
-    if (!await verifyAndJoinCall(connectionCode)) {
-      return;
-    }
+  // Update the joinCall function to properly handle the remote connection
+const joinCall = async () => {
+  if (!await verifyAndJoinCall(connectionCode)) return;
 
-    try {
-      await releaseMediaDevices();
-      console.log('🎥 Requesting media permissions for joining...');
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: true 
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      video: true, 
+      audio: true 
+    });
+    setStream(stream);
+    myVideo.current.srcObject = stream;
+
+    const offerQuery = query(
+      collection(db, 'calls'),
+      where('code', '==', connectionCode),
+      where('type', '==', 'offer'),
+      orderBy('timestamp', 'desc'),
+      limit(1)
+    );
+
+    const unsubscribe = onSnapshot(offerQuery, (snapshot) => {
+      const offerData = snapshot.docs[0]?.data();
+      if (!offerData) return;
+
+      const newPeer = new Peer({
+        initiator: false,
+        trickle: false,
+        stream,
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' },
+            {
+              urls: 'turn:numb.viagenie.ca',
+              username: 'webrtc@live.com',
+              credential: 'muazkh'
+            }
+          ]
+        }
       });
-      console.log('✅ Media access granted for joining');
-      setStream(stream);
-      myVideo.current.srcObject = stream;
 
-      const offerQuery = query(
-        collection(db, 'calls'),
-        where('code', '==', connectionCode),
-        where('type', '==', 'offer'),
-        limit(1)
-      );
-
-      const unsubscribe = onSnapshot(offerQuery, (snapshot) => {
-        const offerData = snapshot.docs[0]?.data();
-        if (!offerData) return;
-
-        console.log('📥 Received offer signal');
-        const newPeer = new Peer({
-          initiator: false,
-          trickle: false,
-          stream,
-          config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:global.stun.twilio.com:3478' }
-            ]
-          }
+      newPeer.on('signal', async (signalData) => {
+        await addDoc(collection(db, 'calls'), {
+          code: connectionCode,
+          taskId,
+          from: currentUser.userId,
+          signalData,
+          type: 'answer',
+          timestamp: new Date().toISOString()
         });
+      });
 
-        newPeer.on('signal', async (signalData) => {
-          console.log('📤 Sending answer signal');
-          await addDoc(collection(db, 'calls'), {
-            code: connectionCode,
-            taskId,
-            from: currentUser.userId,
-            signalData,
-            type: 'answer',
-            timestamp: new Date().toISOString()
-          });
-        });
-
-        newPeer.on('connect', () => {
-          console.log('🤝 Peer connection established as joiner');
-          setCallStatus('Connected');
-          startTimer();
-        });
-
-        newPeer.on('stream', (remoteStream) => {
-          console.log('📡 Received remote stream as joiner');
+      newPeer.on('stream', (remoteStream) => {
+        if (remoteVideo.current) {
           remoteVideo.current.srcObject = remoteStream;
           setIsCallActive(true);
           setCallStatus('Connected');
-        });
-
-        newPeer.signal(offerData.signalData);
-        setPeer(newPeer);
-        connectionRef.current = newPeer;
+          startTimer();
+        }
       });
 
-      return () => unsubscribe();
-    } catch (err) {
-      console.error('❌ Error joining call:', err);
-      setCallStatus('Failed to join call');
-    }
-  };
+      newPeer.signal(offerData.signalData);
+      setPeer(newPeer);
+      connectionRef.current = newPeer;
+    });
+
+    return () => unsubscribe();
+  } catch (err) {
+    console.error('Error joining call:', err);
+    setCallStatus('Failed to join call');
+  }
+};
+
 
   useEffect(() => {
     if (isInitiator && peer) {
