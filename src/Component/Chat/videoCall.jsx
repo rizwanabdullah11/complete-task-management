@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Peer from 'simple-peer';
-import { collection, addDoc, onSnapshot, query,orderBy, where, getDocs, updateDoc, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../Firebase';
 import { PhoneIcon, PhoneXMarkIcon } from '@heroicons/react/24/solid';
 import { Buffer } from 'buffer';
@@ -22,6 +22,7 @@ const VideoCall = () => {
   const [callStatus, setCallStatus] = useState('');
   const [showCodeInput, setShowCodeInput] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
+  const [remoteStream, setRemoteStream] = useState(null);
   const myVideo = useRef();
   const remoteVideo = useRef();
   const connectionRef = useRef();
@@ -39,147 +40,29 @@ const VideoCall = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const releaseMediaDevices = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => {
-        track.stop();
-        stream.removeTrack(track);
-      });
+  const handleRemoteStream = (stream) => {
+    setRemoteStream(stream);
+    if (remoteVideo.current) {
+      remoteVideo.current.srcObject = stream;
     }
-  };
-
-  const createCallSession = async (code, signalData) => {
-    console.log('📞 Creating new call session:', code);
-    await addDoc(collection(db, 'activeCalls'), {
-      code,
-      taskId,
-      initiator: currentUser.userId,
-      status: 'pending',
-      createdAt: new Date().toISOString()
-    });
-
-    await addDoc(collection(db, 'calls'), {
-      code,
-      taskId,
-      from: currentUser.userId,
-      signalData,
-      type: 'offer',
-      timestamp: new Date().toISOString()
-    });
+    setIsCallActive(true);
+    setCallStatus('Connected');
+    startTimer();
   };
 
   const startCall = async () => {
     try {
-      await releaseMediaDevices();
-      console.log('🎥 Requesting media permissions...');
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: true, 
         audio: true 
       });
-      console.log('✅ Media access granted');
-      setStream(stream);
-      myVideo.current.srcObject = stream;
+      setStream(mediaStream);
+      myVideo.current.srcObject = mediaStream;
 
       const newPeer = new Peer({
         initiator: true,
         trickle: false,
-        stream,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' }
-          ]
-        }
-      });
-
-      newPeer.on('signal', async (data) => {
-        const code = Math.random().toString(36).substring(2);
-        console.log('🔑 Generated call code:', code);
-        setCallCode(code);
-        await createCallSession(code, data);
-      });
-
-      newPeer.on('connect', () => {
-        console.log('🤝 Peer connection established as initiator');
-        setCallStatus('Connected');
-        startTimer();
-      });
-
-      newPeer.on('stream', (remoteStream) => {
-        console.log('📡 Received remote stream');
-        remoteVideo.current.srcObject = remoteStream;
-        setIsCallActive(true);
-        setCallStatus('Connected');
-      });
-
-      setPeer(newPeer);
-      connectionRef.current = newPeer;
-      setIsInitiator(true);
-    } catch (err) {
-      console.error('❌ Error starting call:', err);
-      setCallStatus('Failed to start call');
-    }
-  };
-
-  const verifyAndJoinCall = async (code) => {
-    console.log('🔍 Verifying call code:', code);
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      const taskDoc = await getDoc(taskRef);
-      const taskData = taskDoc.data();
-
-      const activeCallQuery = query(
-        collection(db, 'activeCalls'),
-        where('code', '==', code),
-        where('status', '==', 'pending')
-      );
-      
-      const snapshot = await getDocs(activeCallQuery);
-      if (!snapshot.empty) {
-        const callData = snapshot.docs[0].data();
-        
-        if (taskData.client === currentUser.id || taskData.assignee === currentUser.id) {
-          console.log('✅ Call verified successfully');
-          return true;
-        }
-      }
-      
-      setCallStatus('Invalid call code or verification failed');
-      return false;
-    } catch (error) {
-      console.error('Error in verification:', error);
-      return false;
-    }
-  };
-
-  // Update the joinCall function to properly handle the remote connection
-const joinCall = async () => {
-  if (!await verifyAndJoinCall(connectionCode)) return;
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ 
-      video: true, 
-      audio: true 
-    });
-    setStream(stream);
-    myVideo.current.srcObject = stream;
-
-    const offerQuery = query(
-      collection(db, 'calls'),
-      where('code', '==', connectionCode),
-      where('type', '==', 'offer'),
-      orderBy('timestamp', 'desc'),
-      limit(1)
-    );
-
-    const unsubscribe = onSnapshot(offerQuery, (snapshot) => {
-      const offerData = snapshot.docs[0]?.data();
-      if (!offerData) return;
-
-      const newPeer = new Peer({
-        initiator: false,
-        trickle: false,
-        stream,
+        stream: mediaStream,
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -193,42 +76,108 @@ const joinCall = async () => {
         }
       });
 
-      newPeer.on('signal', async (signalData) => {
+      newPeer.on('signal', async (data) => {
+        const code = Math.random().toString(36).substring(2);
+        setCallCode(code);
+        await addDoc(collection(db, 'activeCalls'), {
+          code,
+          taskId,
+          initiator: currentUser.userId,
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        });
+
         await addDoc(collection(db, 'calls'), {
-          code: connectionCode,
+          code,
           taskId,
           from: currentUser.userId,
-          signalData,
-          type: 'answer',
+          signalData: data,
+          type: 'offer',
           timestamp: new Date().toISOString()
         });
       });
 
-      newPeer.on('stream', (remoteStream) => {
-        if (remoteVideo.current) {
-          remoteVideo.current.srcObject = remoteStream;
-          setIsCallActive(true);
-          setCallStatus('Connected');
-          startTimer();
-        }
-      });
+      newPeer.on('stream', handleRemoteStream);
+      newPeer.on('connect', () => setCallStatus('Connected'));
+      newPeer.on('error', (err) => console.error('Peer error:', err));
+      newPeer.on('close', () => endCall());
 
-      newPeer.signal(offerData.signalData);
       setPeer(newPeer);
       connectionRef.current = newPeer;
-    });
+      setIsInitiator(true);
+    } catch (err) {
+      console.error('Error starting call:', err);
+      setCallStatus('Failed to start call');
+    }
+  };
 
-    return () => unsubscribe();
-  } catch (err) {
-    console.error('Error joining call:', err);
-    setCallStatus('Failed to join call');
-  }
-};
+  const joinCall = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: true, 
+        audio: true 
+      });
+      setStream(mediaStream);
+      myVideo.current.srcObject = mediaStream;
 
+      const offerQuery = query(
+        collection(db, 'calls'),
+        where('code', '==', connectionCode),
+        where('type', '==', 'offer'),
+        limit(1)
+      );
+
+      const unsubscribe = onSnapshot(offerQuery, (snapshot) => {
+        const offerData = snapshot.docs[0]?.data();
+        if (!offerData) return;
+
+        const newPeer = new Peer({
+          initiator: false,
+          trickle: false,
+          stream: mediaStream,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:global.stun.twilio.com:3478' },
+              {
+                urls: 'turn:numb.viagenie.ca',
+                username: 'webrtc@live.com',
+                credential: 'muazkh'
+              }
+            ]
+          }
+        });
+
+        newPeer.on('signal', async (signalData) => {
+          await addDoc(collection(db, 'calls'), {
+            code: connectionCode,
+            taskId,
+            from: currentUser.userId,
+            signalData,
+            type: 'answer',
+            timestamp: new Date().toISOString()
+          });
+        });
+
+        newPeer.on('stream', handleRemoteStream);
+        newPeer.on('connect', () => setCallStatus('Connected'));
+        newPeer.on('error', (err) => console.error('Peer error:', err));
+        newPeer.on('close', () => endCall());
+
+        newPeer.signal(offerData.signalData);
+        setPeer(newPeer);
+        connectionRef.current = newPeer;
+      });
+
+      return () => unsubscribe();
+    } catch (err) {
+      console.error('Error joining call:', err);
+      setCallStatus('Failed to join call');
+    }
+  };
 
   useEffect(() => {
     if (isInitiator && peer) {
-      console.log('👂 Listening for answer signals');
       const answerQuery = query(
         collection(db, 'calls'),
         where('code', '==', callCode),
@@ -240,7 +189,6 @@ const joinCall = async () => {
         snapshot.docs.forEach((doc) => {
           const data = doc.data();
           if (peer && data.from !== currentUser.userId) {
-            console.log('📥 Processing answer signal');
             peer.signal(data.signalData);
           }
         });
@@ -250,46 +198,26 @@ const joinCall = async () => {
     }
   }, [isInitiator, peer, callCode, currentUser.userId]);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      releaseMediaDevices();
-    };
-  }, []);
-
-  const handleStartCall = async () => {
-    setShowCodeInput(false);
-    await startCall();
-  };
-
-  const handleJoinWithCode = async () => {
-    if (!connectionCode) {
-      setCallStatus('Please enter a call code');
-      return;
-    }
-    setShowCodeInput(false);
-    await joinCall();
-  };
-
   const endCall = async () => {
-    try {
-      console.log('📴 Ending call');
-      
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    if (remoteStream) {
+      remoteStream.getTracks().forEach(track => track.stop());
+    }
+    if (connectionRef.current) {
+      connectionRef.current.destroy();
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
 
-      releaseMediaDevices();
-      connectionRef.current?.destroy();
-
-      const code = callCode || connectionCode;
+    const code = callCode || connectionCode;
+    if (code) {
       const activeCallQuery = query(
         collection(db, 'activeCalls'),
         where('code', '==', code)
       );
-
       const snapshot = await getDocs(activeCallQuery);
       await Promise.all(
         snapshot.docs.map(doc => 
@@ -299,107 +227,99 @@ const joinCall = async () => {
           })
         )
       );
-
-      setIsCallActive(false);
-      setStream(null);
-      setPeer(null);
-      setCallCode('');
-      setConnectionCode('');
-      setIsInitiator(false);
-      setCallStatus('');
-      setCallDuration(0);
-      
-      if (myVideo.current) myVideo.current.srcObject = null;
-      if (remoteVideo.current) remoteVideo.current.srcObject = null;
-      
-      navigate(`/dashboard/chat/${taskId}`);
-      console.log('✅ Call ended successfully');
-    } catch (error) {
-      console.error('Error ending call:', error);
     }
+
+    setIsCallActive(false);
+    setStream(null);
+    setRemoteStream(null);
+    setPeer(null);
+    setCallCode('');
+    setConnectionCode('');
+    setIsInitiator(false);
+    setCallStatus('');
+    setCallDuration(0);
+
+    if (myVideo.current) myVideo.current.srcObject = null;
+    if (remoteVideo.current) remoteVideo.current.srcObject = null;
+
+    navigate(`/dashboard/chat/${taskId}`);
   };
 
-  return (
-    <div className="h-screen bg-gray-900 flex flex-col items-center justify-center">
-      {showCodeInput ? (
-        <div className="bg-white p-8 rounded-lg shadow-xl w-96">
-          <h2 className="text-2xl font-bold text-center mb-6">Video Call</h2>
-          <div className="space-y-6">
-            <button
-              onClick={handleStartCall}
-              className="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2"
-            >
-              <PhoneIcon className="h-5 w-5" />
-              Start New Call
-            </button>
-            
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or join with code</span>
-              </div>
-            </div>
+  useEffect(() => {
+    return () => {
+      endCall();
+    };
+  }, []);
 
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={connectionCode}
-                onChange={(e) => setConnectionCode(e.target.value)}
-                placeholder="Enter call code"
-                className="w-full border-2 border-gray-200 p-3 rounded-lg focus:outline-none focus:border-blue-500"
-              />
-              <button
-                onClick={handleJoinWithCode}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2"
-              >
-                Join Call
-              </button>
-            </div>
+  return (
+    <div className="h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
+      <div className="grid grid-cols-2 gap-4 w-full max-w-4xl">
+        <div className="relative aspect-video">
+          <video
+            ref={myVideo}
+            autoPlay
+            muted
+            playsInline
+            className="w-full h-full object-cover rounded-lg"
+          />
+          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
+            You
           </div>
         </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="relative">
-              <video
-                ref={myVideo}
-                autoPlay
-                muted
-                playsInline
-                className="w-full rounded-lg shadow-lg bg-gray-200"
-              />
-              <span className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
-                You
-              </span>
-            </div>
-            <div className="relative">
-              <video
-                ref={remoteVideo}
-                autoPlay
-                playsInline
-                className="w-full rounded-lg shadow-lg bg-gray-200"
-              />
-              <span className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
-                Remote User
-              </span>
-            </div>
+        <div className="relative aspect-video">
+          <video
+            ref={remoteVideo}
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover rounded-lg"
+          />
+          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
+            Remote User
           </div>
+        </div>
+      </div>
 
-          {callStatus && (
-            <div className={`text-sm mb-4 ${callStatus === 'Connected' ? 'text-green-500' : 'text-red-500'}`}>
-              {callStatus}
-            </div>
-          )}
+      <div className="mt-4 flex flex-col items-center gap-4">
+        {callStatus && (
+          <div className={`text-sm ${callStatus === 'Connected' ? 'text-green-500' : 'text-red-500'}`}>
+            {callStatus}
+          </div>
+        )}
 
-          {isCallActive && (
-            <div className="text-white text-center mb-4">
-              Call Duration: {formatDuration(callDuration)}
-            </div>
-          )}
+        {isCallActive && (
+          <div className="text-white">
+            Duration: {formatDuration(callDuration)}
+          </div>
+        )}
 
-          <div className="flex gap-4 items-center">
+        <div className="flex gap-4">
+          {!isCallActive ? (
+            <>
+              <button
+                onClick={startCall}
+                className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+              >
+                <PhoneIcon className="h-5 w-5" />
+                Start Call
+              </button>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={connectionCode}
+                  onChange={(e) => setConnectionCode(e.target.value)}
+                  placeholder="Enter call code"
+                  className="px-4 py-2 rounded-lg border"
+                />
+                <button
+                  onClick={joinCall}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
+                >
+                  Join Call
+                </button>
+              </div>
+            </>
+          ) : (
             <button
               onClick={endCall}
               className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
@@ -407,16 +327,16 @@ const joinCall = async () => {
               <PhoneXMarkIcon className="h-5 w-5" />
               End Call
             </button>
-          </div>
-
-          {callCode && isInitiator && (
-            <div className="mt-4 p-4 bg-white rounded-lg shadow-md">
-              <p className="text-center">Share this code with others to join:</p>
-              <p className="text-xl font-bold text-center mt-2">{callCode}</p>
-            </div>
           )}
-        </>
-      )}
+        </div>
+
+        {callCode && isInitiator && (
+          <div className="mt-4 bg-white p-4 rounded-lg">
+            <p className="text-center">Share this code to join:</p>
+            <p className="text-xl font-bold mt-2">{callCode}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
