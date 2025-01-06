@@ -1,7 +1,6 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import Comments from './comments';
 import Activities from './activities';
 import Home from './Home';
 import Userprofile from './Assignee/Assignee';
@@ -18,7 +17,6 @@ const Dashboard = () => {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/new-task" element={<NewTask />} />
-            <Route path="/comments" element={<Comments />} />
             <Route path="/activities" element={<Activities />} />
             <Route path="/users" element={<Userprofile />} />
             <Route path="/clients" element={<Clientprofile />} />

@@ -93,19 +93,22 @@ const NewTask = () => {
       comments: [...prev.comments, {
         ...commentData,
         id: Date.now(),
-        userName: auth.currentUser.displayName || 'Anonymous',
+        userName: auth.currentUser?.displayName || 'Anonymous',
         createdAt: new Date().toISOString(),
         date: new Date().toISOString()
       }]
     }));
   };
-  
+
   const handleCreateActivity = (activityData) => {
     setTaskData(prev => ({
       ...prev,
       activities: [...prev.activities, {
         ...activityData,
         id: Date.now(),
+        performedBy: clientData?.id,
+        performerType: clientData?.userType,
+        performerName: clientData?.username || clientData?.clientName,
         createdAt: new Date().toISOString(),
         date: new Date().toISOString()
       }]
@@ -123,18 +126,18 @@ const NewTask = () => {
   };
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     try {
       const finalTaskData = {
-        createBy : clientData.id,
         title: taskData.title,
         description: taskData.description,
         date: taskData.date,
         status: taskData.status,
         client: taskData.client,
         assignee: taskData.assignee,
-        subTasks: taskData.subTasks,
-        comments: taskData.comments,
-        activities: taskData.activities,
+        subTasks: taskData.subTasks || [],
+        comments: taskData.comments || [],
+        activities: taskData.activities || [],
         updatedAt: new Date().toISOString()
       };
   
@@ -143,58 +146,60 @@ const NewTask = () => {
         await updateDoc(taskRef, finalTaskData);
         console.log("Task updated successfully");
       } else {
-        await addDoc(collection(db, "tasks"), {
-          ...finalTaskData,
-          userId: auth.currentUser.uid,
-          createdAt: new Date().toISOString()
-        });
+        finalTaskData.createdAt = new Date().toISOString();
+        finalTaskData.createBy = clientData?.id;
+        await addDoc(collection(db, "tasks"), finalTaskData);
         console.log("New task created successfully");
       }
+  
       navigate('/dashboard');
     } catch (error) {
       console.error("Error handling task:", error);
     }
   };
   
-
+  
   return (
-    <div className="min-h-screen bg-gray-100 py-16">
+    <div className="min-h-screen bg-gray-100 py-4 sm:py-8 md:py-16 px-2 sm:px-4">
       <div className="max-w-2xl mx-auto bg-white rounded-xl border-2 border-gray-200 transform transition-all hover:scale-[1.01]">
-        <div className="p-4 text-center border-b border-gray-100">
-          <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-green-500 tracking-tight">
+        <div className="p-3 sm:p-4 text-center border-b border-gray-100">
+          <h2 className="text-lg sm:text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-green-500 tracking-tight">
             {editingTask ? 'Edit Task' : 'Create New Task'}
           </h2>
         </div>
-
-        <div className="p-6 space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center gap-3">
-              <FaRegCircle className="text-green-500 w-5 h-5 flex-shrink-0" />
+  
+        <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <FaRegCircle className="text-green-500 w-4 sm:w-5 h-4 sm:h-5 flex-shrink-0" />
               <input
                 type="text"
                 placeholder="Task Title"
                 value={taskData.title}
                 onChange={(e) => setTaskData({...taskData, title: e.target.value})}
-                className="w-full text-lg bg-gray-100 p-2 border-gray-100 rounded-md font-medium text-gray-900 border-none focus:outline-none"
+                className="w-full text-base sm:text-lg bg-gray-100 p-2 rounded-md font-medium text-gray-900 focus:outline-none"
               />
             </div>
-            <div className="ml-8">
+  
+            <div className="ml-6 sm:ml-8">
               <textarea
                 placeholder="Task Description"
                 value={taskData.description}
                 onChange={(e) => setTaskData({...taskData, description: e.target.value})}
-                className="w-full text-gray-500 text-sm bg-gray-100 border-gray-100 rounded-md p-1 border-none focus:outline-none resize-none"
+                className="w-full text-sm bg-gray-100 rounded-md p-2 focus:outline-none resize-none"
                 rows="3"
               />
             </div>
-            <div className="ml-8">
-              <div className="grid grid-cols-1 gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600 text-sm font-semibold w-20">Status</span>
+  
+            <div className="ml-6 sm:ml-8">
+              <div className="grid grid-cols-1 gap-2 sm:gap-3">
+                {/* Status Select */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span className="text-gray-600 text-sm font-semibold w-full sm:w-20">Status</span>
                   <select
                     value={taskData.status}
                     onChange={(e) => setTaskData({...taskData, status: e.target.value})}
-                    className="w-48 px-2 bg-green-100 text-green-500 rounded-md text-sm border-none focus:outline-none h-7"
+                    className="w-full sm:w-48 px-2 py-1.5 bg-green-100 text-green-500 rounded-md text-sm focus:outline-none"
                   >
                     <option value="pending">Pending</option>
                     <option value="in-review">In Review</option>
@@ -204,13 +209,14 @@ const NewTask = () => {
                     <option value="completed">Completed</option>
                   </select>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600 text-sm font-semibold w-20">Client</span>
-                  <select 
+  
+                {/* Client Select */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span className="text-gray-600 text-sm font-semibold w-full sm:w-20">Client</span>
+                  <select
                     value={taskData.client}
                     onChange={(e) => setTaskData({...taskData, client: e.target.value})}
-                    className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
+                    className="w-full sm:w-48 px-2 py-1.5 bg-gray-100 text-gray-600 rounded-md text-sm focus:outline-none"
                   >
                     <option value="">Select Client</option>
                     {clients.map(client => (
@@ -220,14 +226,15 @@ const NewTask = () => {
                     ))}
                   </select>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600 text-sm font-semibold w-20">Assignees</span>
-                    <select
-                      value={taskData.assignee}
-                      onChange={(e) => setTaskData({...taskData, assignee: e.target.value})}
-                      className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-9"
-                    >
+  
+                {/* Assignee Select */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span className="text-gray-600 text-sm font-semibold w-full sm:w-20">Assignees</span>
+                  <select
+                    value={taskData.assignee}
+                    onChange={(e) => setTaskData({...taskData, assignee: e.target.value})}
+                    className="w-full sm:w-48 px-2 py-1.5 bg-gray-100 text-gray-600 rounded-md text-sm focus:outline-none"
+                  >
                     <option value="">Select Assignee</option>
                     {users.map(assignee => (
                       <option key={assignee.id} value={assignee.id}>
@@ -236,21 +243,23 @@ const NewTask = () => {
                     ))}
                   </select>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600 text-sm font-semibold w-20">Due Date</span>
+  
+                {/* Due Date Input */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span className="text-gray-600 text-sm font-semibold w-full sm:w-20">Due Date</span>
                   <input
                     type="date"
                     value={taskData.date}
                     onChange={(e) => setTaskData({...taskData, date: e.target.value})}
-                    className="w-48 px-2 bg-gray-100 text-gray-600 rounded-md text-sm border-none focus:outline-none h-7"
+                    className="w-full sm:w-48 px-2 py-1.5 bg-gray-100 text-gray-600 rounded-md text-sm focus:outline-none"
                   />
                 </div>
               </div>
             </div>
-
-            <div className="grid grid-cols-3 gap-4 border-b pb-4">
-              <button
+  
+            {/* Action Buttons */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 border-b pb-4">
+            <button
                 type="button"
                 onClick={() => setIsSubModalOpen(true)}
                 className="flex items-center justify-center space-x-2 p-2 rounded-lg text-gray-500 hover:bg-gray-50"
@@ -275,20 +284,21 @@ const NewTask = () => {
                 <span className="bg-gray-200 px-2 rounded">{taskData.activities.length}</span>
               </button>
             </div>
-            <div className="flex p-2 gap-2">
-            <button
-            type="submit"
-            className="px-4 py-2 bg-green-100 text-green-600 border-2 border-green-200 rounded-lg hover:bg-green-200 font-medium"
-          >
-            {editingTask ? 'Update Task' : 'Create Task'}
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="px-4 py-2 text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-md font-semibold border-2 border-gray-200"
-          >
-            Cancel
-          </button>
+  
+            <div className="flex flex-col sm:flex-row gap-2 p-2">
+              <button
+                type="submit"
+                className="w-full sm:w-auto px-4 py-2 bg-green-100 text-green-600 border-2 border-green-200 rounded-lg hover:bg-green-200 font-medium text-sm sm:text-base"
+              >
+                {editingTask ? 'Update Task' : 'Create Task'}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="w-full sm:w-auto px-4 py-2 text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-md font-semibold border-2 border-gray-200 text-sm sm:text-base"
+              >
+                Cancel
+              </button>
             </div>
           </form>
         </div>

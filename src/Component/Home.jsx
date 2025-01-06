@@ -272,7 +272,7 @@ const Home = () => {
               <h2 className="text-md font-medium text-green-600">{section.title}</h2>
             </div>
 
-            <div className="bg-white border-2 border-gray-200 rounded-lg">
+            <div className="bg-white border-2 border-gray-200 rounded-sm">
             <table className="w-full table-fixed">
                 <thead>
                   <tr className="border-b">
@@ -419,8 +419,8 @@ const TaskCard = ({ task }) => {
       </div>
 
       {viewType === 'board' ? (
-        <div className="w-full overflow-x-auto scrollbar-hide touch-action-pan-y">
-          <div className="flex flex-nowrap gap-2 sm:gap-4 pb-4">
+        <div className="w-full overflow-hidden">
+          <div className="overflow-x-auto touch-action-pan-x scrollbar-hide">
             <div className="inline-flex min-w-max gap-2 sm:gap-4 lg:grid lg:grid-cols-6">
               {[
                 { title: "Pending Tasks", status: "pending" },

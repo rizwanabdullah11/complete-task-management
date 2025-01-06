@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react'
-import { FiCheck, FiTrash2 } from 'react-icons/fi'
-import { FaEdit, FaRegCircle } from 'react-icons/fa'
-import { BsPerson } from 'react-icons/bs'
-import { CiCalendar } from "react-icons/ci"
-import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
-import { db, auth } from './Firebase';
+import React, { useState, useEffect } from 'react';
+import { FiCheck, FiTrash2 } from 'react-icons/fi';
+import { FaEdit, FaRegCircle } from 'react-icons/fa';
+import { BsPerson } from 'react-icons/bs';
+import { CiCalendar } from "react-icons/ci";
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from './Firebase';
 import { useNavigate } from 'react-router-dom';
 
 const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEditingTask }) => {
@@ -12,29 +12,26 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
   const [users, setUsers] = useState([]);
   const [clients, setClients] = useState([]);
   const navigate = useNavigate();
+
   const getAssigneeName = () => {
-    const assignee = users.find(user => user.userId === task.assigneeId);
+    const assignee = users.find(user => user.id === task.assignee);
     return assignee ? assignee.username : 'Not Assigned';
   };
   
   const getClientName = () => {
-    const client = clients.find(client => client.userId === task.clientId);
+    const client = clients.find(client => client.id === task.client);
     return client ? client.clientName : 'Not Assigned';
   };
+
   useEffect(() => {
-    
     const fetchUsersAndClients = async () => {
-      console.log(task, '00000000')
       try {
-        
         const usersQuery = query(collection(db, "users"), where("userType", "==", "worker"));
         const usersSnapshot = await getDocs(usersQuery);
         const usersList = usersSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
-
-        console.log(usersList,"uselist")
         setUsers(usersList);
         const clientsQuery = query(collection(db, "users"), where("userType", "==", "client"));
         const clientsSnapshot = await getDocs(clientsQuery);
@@ -49,8 +46,9 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
     };
   
     fetchUsersAndClients();
-  }, []);
+  }, [task]);
   
+
   if (!task) return null;
 
   return (
@@ -72,34 +70,34 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
               </span>
             </div>
             <div className="flex items-center gap-2">
-
-            <button
-              onClick={() => {
-                setEditingTask(task);
-                navigate(`/dashboard/new-task`, { state: { editingTask: task } });
-                onClose();
-              }}
-              className="p-2 hover:bg-gray-100 rounded-sm flex items-center gap-1 text-gray-700"
-            >
-              <FaEdit className="text-md" />
-            </button>
-            <button
-              onClick={() => {
-                handleDeleteTask(task.id);
-                onClose();
-              }}
-              className="p-2 hover:bg-gray-100 rounded-sm"
-            >
-            <FiTrash2 className="text-gray-700 text-md" />
-            </button>
-            <button
-              onClick={onClose}
-              className="text-gray-700 p-1 hover:bg-gray-100 rounded-sm"
-            >
-              ✕
-            </button>
+              <button
+                onClick={() => {
+                  setEditingTask(task);
+                  navigate(`/dashboard/new-task`, { state: { editingTask: task } });
+                  onClose();
+                }}
+                className="p-2 hover:bg-gray-100 rounded-sm flex items-center gap-1 text-gray-700"
+              >
+                <FaEdit className="text-md" />
+              </button>
+              <button
+                onClick={() => {
+                  handleDeleteTask(task.id);
+                  onClose();
+                }}
+                className="p-2 hover:bg-gray-100 rounded-sm"
+              >
+                <FiTrash2 className="text-gray-700 text-md" />
+              </button>
+              <button
+                onClick={onClose}
+                className="text-gray-700 p-1 hover:bg-gray-100 rounded-sm"
+              >
+                ✕
+              </button>
             </div>
           </div>
+
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <FaRegCircle className="text-green-500 w-5 h-5 flex-shrink-0" />
@@ -124,16 +122,13 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
                 {getAssigneeName()}
               </div>
             </div>
-
           </div>
 
           <div className="grid grid-cols-3 gap-4 border-b pb-4">
             <div
               onClick={() => setActiveTab('subtasks')}
               className={`flex items-center justify-center space-x-2 bg-gray-100 cursor-pointer p-2 rounded-lg ${
-                activeTab === 'subtasks' 
-                  ? 'bg-gray-200 text-gray-900' 
-                  : 'text-gray-500 hover:bg-gray-200'
+                activeTab === 'subtasks' ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200'
               }`}
             >
               <span className="font-medium">Subtasks</span>
@@ -142,9 +137,7 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
             <div
               onClick={() => setActiveTab('comments')}
               className={`flex items-center justify-center space-x-2 bg-gray-100 cursor-pointer p-2 rounded-lg ${
-                activeTab === 'comments' 
-                  ? 'bg-gray-200 text-gray-900' 
-                  : 'text-gray-500 hover:bg-gray-200'
+                activeTab === 'comments' ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200'
               }`}
             >
               <span className="font-medium">Comments</span>
@@ -153,24 +146,23 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
             <div
               onClick={() => setActiveTab('activity')}
               className={`flex items-center justify-center space-x-2 bg-gray-100 cursor-pointer p-2 rounded-lg ${
-                activeTab === 'activity' 
-                  ? 'bg-gray-200 text-gray-900' 
-                  : 'text-gray-500 hover:bg-gray-200'
+                activeTab === 'activity' ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200'
               }`}
             >
               <span className="font-medium">Activity</span>
               <span className="bg-gray-200 px-2 rounded">{task.activities?.length || 0}</span>
             </div>
           </div>
+
           <div className="mt-4 space-y-3">
-          {activeTab === 'subtasks' && (
-                <>
+            {activeTab === 'subtasks' && (
+              <>
                 {task.subTasks?.map(subtask => (
-                    <div key={subtask.id} className="bg-gray-100 p-4 rounded-md">
-                        <h4 className="text-sm text-gray-700">{subtask.subTitle}</h4>
-                    </div>
+                  <div key={subtask.id} className="bg-gray-100 p-4 rounded-md">
+                    <h4 className="text-sm text-gray-700">{subtask.subTitle}</h4>
+                  </div>
                 ))}
-                </>
+              </>
             )}
             {activeTab === 'comments' && (
               <>
@@ -187,14 +179,20 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
                 ))}
               </>
             )}
-
             {activeTab === 'activity' && (
               <>
                 {task.activities?.slice().reverse().map(activity => (
                   <div key={activity.id} className="bg-gray-100 p-4 rounded-md">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-gray-800">{activity.performerName}</span>
                       <span className="text-sm text-gray-500">
-                        {new Date(activity.createdAt).toLocaleDateString()}
+                        {new Date(activity.createdAt).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
                       </span>
                     </div>
                     <h5 className="font-medium text-gray-800">{activity.title}</h5>
@@ -203,6 +201,7 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
                 ))}
               </>
             )}
+
             <div className="flex gap-2 border-b pb-2">
               <button
                 onClick={() => handleCompleteTask(task.id)}

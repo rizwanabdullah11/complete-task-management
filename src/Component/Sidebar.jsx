@@ -29,7 +29,6 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* Mobile Menu Button */}
       <div className="lg:hidden fixed top-0 left-0 z-50">
         <button onClick={handleMobileMenuClick} className="h-full p-2 bg-gray-100">
           {isMobileMenuOpen ? (
@@ -39,8 +38,6 @@ const Sidebar = () => {
           )}
         </button>
       </div>
-
-      {/* Mobile Sidebar */}
       <div className={`lg:hidden fixed inset-y-0 left-0 z-40 w-64 bg-white transform transition-transform duration-300 ease-in-out font-poppins ${
         isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-4">
@@ -73,13 +70,10 @@ const Sidebar = () => {
         </div>
       </div>
 
-      {/* Desktop Sidebar */}
       <div className="hidden lg:block lg:w-20 hover:lg:w-1/5 h-screen bg-white duration-300 overflow-y-auto group">
         <div className="p-4">
           <div className="h-16 flex items-center justify-center mb-8">
-            {/* Image placeholder */}
             <div className="w-40 mt-4 h-24 bg-gray-100 rounded-lg">
-              {/* Add your image here */}
               <img src={Image} alt="Image" className="w-full h-full object-cover rounded-lg" /> 
             </div>
           </div>
@@ -111,8 +105,6 @@ const Sidebar = () => {
           </div>
         </div>
       </div>
-
-      {/* Overlay for mobile */}
       {isMobileMenuOpen && (
         <div 
           className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"

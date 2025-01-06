@@ -29,15 +29,15 @@ const ClientModal = ({ isOpen, onClose, onSubmit }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl border-2 border-gray-200 w-full max-w-xl">
-        <div className="p-3 text-center border-b border-gray-100">
-          <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-green-500 tracking-tight">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl border-2 border-gray-200 w-full max-w-md">
+        <div className="p-3 sm:p-4 text-center border-b border-gray-100">
+          <h2 className="text-lg sm:text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-green-500 tracking-tight">
             Create New Client
           </h2>
         </div>
 
-        <div className="p-3 space-y-2">
+        <div className="p-3 sm:p-4 space-y-3">
           <form onSubmit={handleSubmit} className="space-y-2">
             <input
               type="text"

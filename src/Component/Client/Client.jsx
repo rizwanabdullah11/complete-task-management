@@ -29,36 +29,52 @@ const Clients = () => {
     try {
       const usersRef = collection(db, "users");
       const newClientData = {
-        ...clientData,
-        userId: auth.currentUser?.uid, // Add userId
+        clientName: clientData.clientName,
+        companyName: clientData.companyName,
+        email: clientData.email,
+        contactNumber: clientData.contactNumber,
+        address: clientData.address,
+        projectType: clientData.projectType,
+        password: clientData.password,
         status: 'active',
-        userType: "client"
+        userType: "client",
+        createdAt: new Date().toISOString()
       };
-      await addDoc(usersRef, newClientData);
+      if (auth.currentUser) {
+        newClientData.userId = auth.currentUser.uid;
+      }
+      
+      const docRef = await addDoc(usersRef, newClientData);
+      console.log('Client document written with ID: ', docRef.id);
       fetchClients();
     } catch (error) {
       console.error("Error adding client:", error);
     }
   };
+  
 
   useEffect(() => {
     fetchClients();
   }, []);
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Clients Management</h2>
+    <div className="pl-8 sm:p-4 md:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-2">
+        <h2 className="text-xl sm:text-md md:text-xl ml-2 font-bold text-gray-800 tracking-tight">
+          Clients Management
+        </h2>
+
         <button
           onClick={() => setIsModalOpen(true)}
-          className="px-4 py-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 font-medium"
+          className="w-full sm:w-auto px-4 py-2 bg-green-100 text-green-600 rounded-sm hover:bg-green-200 font-medium text-sm sm:text-base"
         >
           Create Client
         </button>
       </div>
 
-      <div className="bg-white border-2 border-gray-200 rounded-lg">
-        <table className="w-full table-fixed">
+      <div className="bg-white border-2 border-gray-200 rounded-sm overflow-hidden">
+        <div className="overflow-x-auto touch-action-pan-x">
+          <table className="w-full min-w-[900px]">
           <thead>
             <tr className="border-b">
               <th className="text-left p-2 text-sm text-gray-600 font-medium w-1/6">Client Name</th>
@@ -109,6 +125,7 @@ const Clients = () => {
             ))}
           </tbody>
         </table>
+      </div>
       </div>
 
       <ClientModal
