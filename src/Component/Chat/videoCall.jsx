@@ -24,6 +24,7 @@ const VideoCall = () => {
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [taskData, setTaskData] = useState(null);
   const [otherUserId, setOtherUserId] = useState(null);
+  const [remoteUserName, setRemoteUserName] = useState('');
   const myVideo = useRef();
   const remoteVideo = useRef();
   const connectionRef = useRef();
@@ -49,7 +50,35 @@ const VideoCall = () => {
 
     getTaskData();
   }, [taskId, currentUser]);
-
+  useEffect(() => {
+    const getRemoteUserName = async () => {
+      if (otherUserId) {
+        const userRef = doc(db, 'users', otherUserId);
+        const userDoc = await getDoc(userRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setRemoteUserName(userData.fullName || userData.clientName);
+        }
+      }
+    };
+    getRemoteUserName();
+  }, [otherUserId]);
+  useEffect(() => {
+    if (isCallActive) {
+      const code = callCode || connectionCode;
+      const unsubscribe = onSnapshot(
+        query(collection(db, 'activeCalls'), where('code', '==', code)),
+        (snapshot) => {
+          snapshot.forEach((doc) => {
+            if (doc.data().status === 'ended') {
+              endCall();
+            }
+          });
+        }
+      );
+      return () => unsubscribe();
+    }
+  }, [isCallActive]);
   const getMediaStream = async () => {
     console.log('🎥 Requesting media access...');
     try {
@@ -356,7 +385,7 @@ const VideoCall = () => {
             </div>
           )}
           <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
-            Remote User
+            {remoteUserName || 'Remote User'}
           </div>
         </div>
       </div>
