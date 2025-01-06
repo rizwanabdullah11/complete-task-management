@@ -1,9 +1,8 @@
-// At the top with imports
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Peer from 'simple-peer';
-import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, limit } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../Firebase';
 import { PhoneIcon, PhoneXMarkIcon } from '@heroicons/react/24/solid';
 import { Buffer } from 'buffer';
@@ -22,10 +21,70 @@ const VideoCall = () => {
   const [isInitiator, setIsInitiator] = useState(false);
   const [callStatus, setCallStatus] = useState('');
   const [callDuration, setCallDuration] = useState(0);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [taskData, setTaskData] = useState(null);
+  const [otherUserId, setOtherUserId] = useState(null);
   const myVideo = useRef();
   const remoteVideo = useRef();
   const connectionRef = useRef();
   const timerRef = useRef();
+
+  useEffect(() => {
+    const getTaskData = async () => {
+      try {
+        const taskRef = doc(db, 'tasks', taskId);
+        const taskDoc = await getDoc(taskRef);
+        
+        if (taskDoc.exists()) {
+          const data = taskDoc.data();
+          setTaskData(data);
+          const otherId = currentUser.id === data.client ? data.assignee : data.client;
+          setOtherUserId(otherId);
+          console.log('Task and user data loaded:', { taskId, otherId });
+        }
+      } catch (err) {
+        console.error('Error fetching task data:', err);
+      }
+    };
+
+    getTaskData();
+  }, [taskId, currentUser]);
+
+  const getMediaStream = async () => {
+    console.log('🎥 Requesting media access...');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: "user"
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      });
+      console.log('✅ Media access granted successfully');
+      setIsVideoEnabled(true);
+      return stream;
+    } catch (err) {
+      console.log(`⚠️ Media access error: ${err.name}`);
+      if (err.name === 'NotReadableError' || err.name === 'AbortError') {
+        console.log('🎤 Attempting audio-only fallback...');
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          video: false,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true
+          }
+        });
+        console.log('✅ Audio-only stream established');
+        setIsVideoEnabled(false);
+        return audioStream;
+      }
+      throw err;
+    }
+  };
 
   const startTimer = () => {
     if (!timerRef.current) {
@@ -41,23 +100,41 @@ const VideoCall = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleRemoteStream = (remoteStream) => {
-    console.log('📡 Remote stream connected');
-    if (remoteVideo.current) {
-      remoteVideo.current.srcObject = remoteStream;
-      remoteVideo.current.play().catch(err => console.log('Remote video play error:', err));
+  const createCallSession = async (code, signalData) => {
+    if (!otherUserId) {
+      console.error('Cannot create call: Other user not found');
+      return;
     }
-    setIsCallActive(true);
-    setCallStatus('Connected');
-    startTimer();
+
+    await addDoc(collection(db, 'activeCalls'), {
+      code,
+      taskId,
+      initiator: currentUser.id,
+      receiver: otherUserId,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      hasVideo: isVideoEnabled
+    });
+
+    await addDoc(collection(db, 'calls'), {
+      code,
+      taskId,
+      from: currentUser.id,
+      to: otherUserId,
+      signalData,
+      type: 'offer',
+      timestamp: new Date().toISOString()
+    });
   };
 
   const startCall = async () => {
+    if (!otherUserId) {
+      setCallStatus('Cannot start call: Other user not found');
+      return;
+    }
+
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: true 
-      });
+      const mediaStream = await getMediaStream();
       setStream(mediaStream);
       if (myVideo.current) {
         myVideo.current.srcObject = mediaStream;
@@ -78,28 +155,22 @@ const VideoCall = () => {
       newPeer.on('signal', async (data) => {
         const code = Math.random().toString(36).substring(2);
         setCallCode(code);
-        await addDoc(collection(db, 'activeCalls'), {
-          code,
-          taskId,
-          initiator: currentUser.userId,
-          status: 'pending',
-          createdAt: new Date().toISOString()
-        });
-
-        await addDoc(collection(db, 'calls'), {
-          code,
-          taskId,
-          from: currentUser.userId,
-          signalData: data,
-          type: 'offer',
-          timestamp: new Date().toISOString()
-        });
+        await createCallSession(code, data);
       });
 
-      newPeer.on('stream', handleRemoteStream);
-      newPeer.on('connect', () => {
-        console.log('🤝 Peer connection established');
+      newPeer.on('stream', (remoteStream) => {
+        if (remoteVideo.current) {
+          remoteVideo.current.srcObject = remoteStream;
+          remoteVideo.current.play().catch(err => console.log('Remote video play error:', err));
+        }
+        setIsCallActive(true);
         setCallStatus('Connected');
+        startTimer();
+      });
+
+      newPeer.on('connect', () => {
+        setCallStatus('Connected');
+        startTimer();
       });
 
       setPeer(newPeer);
@@ -113,10 +184,7 @@ const VideoCall = () => {
 
   const joinCall = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: true 
-      });
+      const mediaStream = await getMediaStream();
       setStream(mediaStream);
       if (myVideo.current) {
         myVideo.current.srcObject = mediaStream;
@@ -149,17 +217,22 @@ const VideoCall = () => {
           await addDoc(collection(db, 'calls'), {
             code: connectionCode,
             taskId,
-            from: currentUser.userId,
+            from: currentUser.id,
+            to: offerData.from,
             signalData,
             type: 'answer',
             timestamp: new Date().toISOString()
           });
         });
 
-        newPeer.on('stream', handleRemoteStream);
-        newPeer.on('connect', () => {
-          console.log('🤝 Peer connection established');
+        newPeer.on('stream', (remoteStream) => {
+          if (remoteVideo.current) {
+            remoteVideo.current.srcObject = remoteStream;
+            remoteVideo.current.play().catch(err => console.log('Remote video play error:', err));
+          }
+          setIsCallActive(true);
           setCallStatus('Connected');
+          startTimer();
         });
 
         newPeer.signal(offerData.signalData);
@@ -186,7 +259,7 @@ const VideoCall = () => {
       const unsubscribe = onSnapshot(answerQuery, (snapshot) => {
         snapshot.docs.forEach((doc) => {
           const data = doc.data();
-          if (peer && data.from !== currentUser.userId) {
+          if (peer && data.from !== currentUser.id) {
             peer.signal(data.signalData);
           }
         });
@@ -194,13 +267,11 @@ const VideoCall = () => {
 
       return () => unsubscribe();
     }
-  }, [isInitiator, peer, callCode, currentUser.userId]);
+  }, [isInitiator, peer, callCode, currentUser.id]);
 
   const endCall = async () => {
     if (stream) {
-      stream.getTracks().forEach(track => {
-        track.stop();
-      });
+      stream.getTracks().forEach(track => track.stop());
     }
     if (connectionRef.current) {
       connectionRef.current.destroy();
@@ -218,7 +289,10 @@ const VideoCall = () => {
       const snapshot = await getDocs(activeCallQuery);
       await Promise.all(
         snapshot.docs.map(doc => 
-          updateDoc(doc.ref, { status: 'ended' })
+          updateDoc(doc.ref, { 
+            status: 'ended',
+            endedAt: new Date().toISOString()
+          })
         )
       );
     }
@@ -258,10 +332,15 @@ const VideoCall = () => {
             autoPlay
             muted
             playsInline
-            className="w-full h-full object-cover rounded-lg"
+            className={`w-full h-full object-cover rounded-lg ${!isVideoEnabled ? 'hidden' : ''}`}
           />
+          {!isVideoEnabled && (
+            <div className="w-full h-full bg-gray-700 rounded-lg flex items-center justify-center">
+              <span className="text-white">Audio Only</span>
+            </div>
+          )}
           <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
-            You
+            You ({currentUser.fullName || currentUser.clientName})
           </div>
         </div>
         <div className="relative aspect-video">
@@ -269,8 +348,13 @@ const VideoCall = () => {
             ref={remoteVideo}
             autoPlay
             playsInline
-            className="w-full h-full object-cover rounded-lg"
+            className={`w-full h-full object-cover rounded-lg ${!isVideoEnabled ? 'hidden' : ''}`}
           />
+          {!isVideoEnabled && (
+            <div className="w-full h-full bg-gray-700 rounded-lg flex items-center justify-center">
+              <span className="text-white">Audio Only</span>
+            </div>
+          )}
           <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
             Remote User
           </div>
