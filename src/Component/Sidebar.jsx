@@ -31,10 +31,7 @@ const Sidebar = () => {
     <>
       {/* Mobile Menu Button */}
       <div className="lg:hidden fixed top-0 left-0 z-50">
-        <button
-          onClick={handleMobileMenuClick}
-          className="h-full p-2 bg-gray-100"
-        >
+        <button onClick={handleMobileMenuClick} className="h-full p-2 bg-gray-100">
           {isMobileMenuOpen ? (
             <IoMdClose className="w-6 h-6 text-green-500" />
           ) : (
@@ -44,16 +41,14 @@ const Sidebar = () => {
       </div>
 
       {/* Mobile Sidebar */}
-      <div className={`lg:hidden fixed inset-y-0 left-0 z-40 w-64 bg-white transform transition-transform duration-300 ease-in-out ${
-        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
+      <div className={`lg:hidden fixed inset-y-0 left-0 z-40 w-64 bg-white transform transition-transform duration-300 ease-in-out font-poppins ${
+        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-4">
           <div className="h-16 flex items-center justify-center mb-8">
-            <div className="w-16 h-16 bg-gray-100 rounded-lg">
-              <img src={Image} alt="Logo" className="w-full h-full object-cover rounded-lg" /> 
+            <div className="w-24 h-16 bg-gray-100 rounded-lg">
+              <img src={Image} alt="Logo" className="w-full h-full object-cover rounded-lg" />
             </div>
           </div>
-
           <div className="flex flex-col gap-4">
             {menuItems.map((item) => (
               <Link
@@ -63,16 +58,13 @@ const Sidebar = () => {
                 className={`flex items-center gap-4 p-4 rounded-xl ${
                   location.pathname === item.path 
                     ? 'bg-green-200 bg-opacity-20 border-2 border-green-300' 
-                    : 'hover:bg-gray-100'
-                }`}
-              >
+                    : 'hover:bg-gray-100'}`}>
                 <item.icon 
                   size={22} 
                   className={location.pathname === item.path ? 'text-green-600' : 'text-green-500'}
                 />
-                <span className={`font-semibold tracking-wide text-[15px] ${
-                  location.pathname === item.path ? 'text-green-600' : 'text-green-500'
-                }`}>
+                <span className={`font-medium tracking-wide text-[15px] ${
+                  location.pathname === item.path ? 'text-green-600' : 'text-green-500'}`}>
                   {item.label}
                 </span>
               </Link>
@@ -81,13 +73,12 @@ const Sidebar = () => {
         </div>
       </div>
 
-
       {/* Desktop Sidebar */}
       <div className="hidden lg:block lg:w-20 hover:lg:w-1/5 h-screen bg-white duration-300 overflow-y-auto group">
         <div className="p-4">
           <div className="h-16 flex items-center justify-center mb-8">
             {/* Image placeholder */}
-            <div className="w-24 mt-4 h-24 bg-gray-100 rounded-lg">
+            <div className="w-40 mt-4 h-24 bg-gray-100 rounded-lg">
               {/* Add your image here */}
               <img src={Image} alt="Image" className="w-full h-full object-cover rounded-lg" /> 
             </div>

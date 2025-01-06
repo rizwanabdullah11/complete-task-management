@@ -24,7 +24,6 @@ const Home = () => {
   const userType = useSelector(state => state.auth.userType);
   const [editingTask, setEditingTask] = useState(null)
   const [viewType, setViewType] = useState('board')
-  const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubModalOpen, setIsSubModalOpen] = useState(false)
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false)
@@ -86,20 +85,6 @@ const Home = () => {
       </div>
     )
   }
-
-  // useEffect(() => {
-  //   const fetchTasks = async () => {
-  //     const tasksSnapshot = await getDocs(collection(db, "tasks"));
-  //     const tasksList = tasksSnapshot.docs.map(doc => ({
-  //       id: doc.id,
-  //       ...doc.data()
-  //     }));
-  //     console.log("All Tasks:", tasksList);
-  //     setTasks(tasksList);
-  //   };
-
-  //   fetchTasks();
-  // }, []);
   const clientData = useSelector(state => state.auth.currentUser);
   const assigneeData = useSelector(state => state.auth.currentUser);
 
@@ -110,13 +95,11 @@ const Home = () => {
       try {
         let tasksQuery;
         if (clientData?.userType === "client") {
-          // console.log("3333333333");
           tasksQuery = query(
             collection(db, "tasks"),
             where("client", "==", clientData.id)
           );
         } else if (assigneeData?.userType === "worker") {
-          // console.log("4444444444444");
 
           tasksQuery = query(
             collection(db, "tasks"),
@@ -145,23 +128,6 @@ const Home = () => {
     fetchTasks();
   }, [clientData, assigneeData]);
   
-
-  const handleCreateTask = async (taskData) => {
-    try {
-      const newTask = {
-        ...taskData,
-        userId: auth.currentUser.uid,
-        createdAt: new Date().toISOString(),
-        comments: taskData.comments || [],
-        activities: taskData.activities || []
-      };
-      const docRef = await addDoc(collection(db, "tasks"), newTask);
-      setTasks([{ ...newTask, id: docRef.id }, ...tasks]);
-    } catch (error) {
-      console.error("Error creating task:", error);
-    }
-  };
-
   const handleCreateSubTask = async (subtaskData) => {
     try {
       const newSubTask = {
@@ -293,7 +259,7 @@ const Home = () => {
   ];
 
   return (
-    <div className="px-4 py-3">
+    <div className="px-1 py-3">
       {sections.map(section => {
         const sectionTasks = tasks.filter(task => task.status === section.status);
         
@@ -365,47 +331,54 @@ const Home = () => {
   );
 };
 
-  const TaskCard = ({ task }) => {
-    return (
-      <div 
-        onClick={() => setSelectedTask(task)}
-        className="transform transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-      >
-        <div className="bg-white w-80 ml-2 mr-2 rounded-lg border-2 border-gray-200">
-          <div className="p-2">
-            <div className="flex flex-col">
-              <h3 className="text-md text-left text-gray-800 flex items-center gap-2 mb-2">
-                <FaRegCircle className="text-green-500 w-3.5 h-3.5" />
-                {task.title}
-              </h3>
-              <div className="flex flex-wrap gap-2 ml-5">
-                <span className="px-2 py-1 bg-green-100 text-green-400 border border-green-500 text-xs rounded-md flex items-center gap-1">
-                  <CiCalendar className="w-3.5 h-3.5" />
-                  {new Date(task.date).toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric'
-                  })}
-                </span>
-                <span className="px-2 py-1 border border-2 text-gray-500 text-xs rounded-md flex items-center gap-1">
-                  <BsPerson className="w-3.5 h-3.5" />
+const TaskCard = ({ task }) => {
+  return (
+    <div
+      onClick={() => setSelectedTask(task)}
+      className="transform transition-all duration-300 hover:-translate-y-1 cursor-pointer touch-action-manipulation"
+    >
+      <div className="bg-white w-[280px] sm:w-80 mx-1.5 sm:mx-2 rounded-lg border-2 border-gray-200 shadow-sm hover:shadow-md">
+        <div className="p-2 sm:p-3">
+          <div className="flex flex-col">
+            <h3 className="text-sm sm:text-md text-left text-gray-800 flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 font-medium">
+              <FaRegCircle className="text-green-500 w-3 sm:w-3.5 h-3 sm:h-3.5 flex-shrink-0" />
+              <span className="truncate">{task.title}</span>
+            </h3>
+
+            <div className="flex flex-wrap gap-1.5 sm:gap-2 ml-4 sm:ml-5">
+              <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-400 border border-green-500 text-[10px] sm:text-xs rounded-md flex items-center gap-1 whitespace-nowrap">
+                <CiCalendar className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+                {new Date(task.date).toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </span>
+
+              <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 border border-2 text-gray-500 text-[10px] sm:text-xs rounded-md flex items-center gap-1 whitespace-nowrap">
+                <BsPerson className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+                <span className="truncate max-w-[80px] sm:max-w-[100px]">
                   {task.assigned || 'Unassigned'}
                 </span>
-                
-                {task.subTasks?.length > 0 && (
-                  <div className="flex items-center border gap-1 p-1 border-2 text-gray-500 rounded-md">
-                    <span className="text-xs">3/3</span>
-                  </div>
-                )}
+              </span>
+
+              {task.subTasks?.length > 0 && (
+                <div className="flex items-center border gap-1 px-1.5 py-0.5 sm:p-1 border-2 text-gray-500 rounded-md">
+                  <span className="text-[10px] sm:text-xs">3/3</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1.5 ml-auto">
                 {task.comments?.length > 0 && (
-                  <div className="flex items-center gap-1 text-gray-500">
-                    <LiaFileSolid className="w-5.5 h-3.5" />
+                  <div className="flex items-center text-gray-500">
+                    <LiaFileSolid className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                   </div>
                 )}
+
                 {task.hasChat && (
-                  <div className="flex items-center gap-1 text-blue-500">
-                    <FiMessageSquare className="w-4 h-4" />
-                    <span className="text-xs">Chat</span>
+                  <div className="flex items-center gap-0.5 text-blue-500">
+                    <FiMessageSquare className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+                    <span className="text-[10px] sm:text-xs">Chat</span>
                   </div>
                 )}
               </div>
@@ -413,90 +386,77 @@ const Home = () => {
           </div>
         </div>
       </div>
-    );
-  };
-  return (
-    <DndProvider backend={isMobile ? TouchBackend : HTML5Backend}>
-      <div className="min-h-screen p-6">
-        <div className="flex border-b">
-        <button
-            onClick={() => setViewType('board')}
-            className={`px-3 py-1 flex items-center transition-all ${
-              viewType === 'board'
-                ? 'bg-white text-green-500 border-b-2 border-green-500'
-                : 'bg-gray-200 text-gray-600 hover:bg-gray-200 border-b-2 border-transparent'
-            }`}
-          >
-            <BsGrid3X3Gap className="w-4 h-4 mr-2" />
-            Board
-          </button>
-          <button 
-            onClick={() => setViewType('list')}
-            className={`px-3 py-1 border-b-2 border-green-500 flex items-center transition-all ${
-              viewType === 'list' 
-                 ? 'bg-white text-green-500 border-b-2 border-green-500'
-                : 'bg-gray-200 text-gray-600 hover:bg-gray-200 border-b-2 border-transparent'
-            }`}
-          >
-            <BsList className="w-4 h-4 mr-2" />
-            List
-          </button>
-        </div>
+    </div>
+  );
+};
 
-        {viewType === 'board' ? (
-          <div className="w-full overflow-x-auto scrollbar-hide">
-            <div className="flex flex-col lg:flex-row" >
-              <div className="inline-flex min-w-max gap-4 lg:grid lg:grid-cols-6 lg:gap-4">
+  return (
+  <DndProvider backend={isMobile ? TouchBackend : HTML5Backend}>
+    <div className="min-h-screen pl-7">
+      <div className="flex border-b mb-2 sm:mb-4">
+        <button
+          onClick={() => setViewType('board')}
+          className={`px-2 sm:px-4 py-1 sm:py-1.5 flex items-center transition-all text-xs sm:text-base ${
+            viewType === 'board'
+              ? 'bg-green-100 font-semibold text-green-500 border-b-2 border-green-500'
+              : 'bg-gray-200 text-gray-600 hover:bg-gray-200 border-b-2 border-transparent'
+          }`}
+        >
+          <BsGrid3X3Gap className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+          Board
+        </button>
+        <button
+          onClick={() => setViewType('list')}
+          className={`px-2 sm:px-4 py-1 sm:py-1.5 ml-2 sm:ml-4 flex items-center transition-all text-xs sm:text-base ${
+            viewType === 'list'
+              ? 'bg-green-100 font-semibold text-green-500 border-b-2 border-green-500'
+              : 'bg-gray-200 text-gray-600 hover:bg-gray-200 border-b-2 border-transparent'
+          }`}
+        >
+          <BsList className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+          List
+        </button>
+      </div>
+
+      {viewType === 'board' ? (
+        <div className="w-full overflow-x-auto scrollbar-hide touch-action-pan-y">
+          <div className="flex flex-nowrap gap-2 sm:gap-4 pb-4">
+            <div className="inline-flex min-w-max gap-2 sm:gap-4 lg:grid lg:grid-cols-6">
+              {[
+                { title: "Pending Tasks", status: "pending" },
+                { title: "In Review", status: "in-review" },
+                { title: "Follow Up", status: "follow-up" },
+                { title: "Backlog", status: "backlog" },
+                { title: "In Progress", status: "in-progress" },
+                { title: "Completed", status: "completed" }
+              ].map(column => (
                 <TaskColumn
-                  title="Pending Tasks"
-                  tasks={tasks.filter(task => task.status === 'pending')}
-                  status="pending"
+                  key={column.status}
+                  title={column.title}
+                  tasks={tasks.filter(task => task.status === column.status)}
+                  status={column.status}
                 />
-                <TaskColumn
-                  title="In Review"
-                  tasks={tasks.filter(task => task.status === 'in-review')}
-                  status="in-review"
-                />
-                <TaskColumn
-                  title="Follow Up"
-                  tasks={tasks.filter(task => task.status === 'follow-up')}
-                  status="follow-up"
-                />
-                <TaskColumn
-                  title="Backlog"
-                  tasks={tasks.filter(task => task.status === 'backlog')}
-                  status="backlog"
-                />
-                <TaskColumn
-                  title="In Progress"
-                  tasks={tasks.filter(task => task.status === 'in-progress')}
-                  status="in-progress"
-                />
-                <TaskColumn
-                  title="Completed"
-                  tasks={tasks.filter(task => task.status === 'completed')}
-                  status="completed"
-                />
-              </div>
+              ))}
             </div>
           </div>
-        ) : (
-          <ListView />
-        )}
-        {selectedTask && (
-          <TaskModal 
-            task={selectedTask} 
-            onClose={() => setSelectedTask(null)}
-            handleCompleteTask={handleCompleteTask}
-            handleDeleteTask={handleDeleteTask}
-            handleCreateSubTask={handleCreateSubTask}
-            handleCreateComment={handleCreateComment}
-            handleCreateActivity={handleCreateActivity}
-            setEditingTask={setEditingTask}
-          />
-        )}
+        </div>
+      ) : (
+        <ListView />
+      )}
 
-      </div>
+      {selectedTask && (
+        <TaskModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          handleCompleteTask={handleCompleteTask}
+          handleDeleteTask={handleDeleteTask}
+          handleCreateSubTask={handleCreateSubTask}
+          handleCreateComment={handleCreateComment}
+          handleCreateActivity={handleCreateActivity}
+          setEditingTask={setEditingTask}
+        />
+      )}
+
       <SubModal
         isOpen={isSubModalOpen}
         onClose={() => setIsSubModalOpen(false)}
@@ -514,7 +474,8 @@ const Home = () => {
         onClose={() => setIsActivityModalOpen(false)}
         onSubmit={handleCreateActivity}
       />
-    </DndProvider>
-  )
+    </div>
+  </DndProvider>
+  );
 }
 export default Home

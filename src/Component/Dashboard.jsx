@@ -11,10 +11,10 @@ import ChatRoom from './Chat/chatRoom';
 
 const Dashboard = () => {
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex h-screen">
       <Sidebar />
-      <div className="flex-1 ml-8 lg:ml-4 transition-all duration-300">
-        <div className="h-full p-4">
+      <div className="flex-1 transition-all duration-300 overflow-hidden">
+        <div className="h-full p-4 overflow-auto">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/new-task" element={<NewTask />} />
