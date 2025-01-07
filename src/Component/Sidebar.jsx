@@ -46,6 +46,7 @@ const Sidebar = () => {
               <img src={Image} alt="Logo" className="w-full h-full object-cover rounded-lg" />
             </div>
           </div>
+
           <div className="flex flex-col gap-4">
             {menuItems.map((item) => (
               <Link
@@ -72,12 +73,13 @@ const Sidebar = () => {
 
       <div className="hidden lg:block lg:w-20 hover:lg:w-1/5 h-screen bg-white duration-300 overflow-y-auto group">
         <div className="p-4">
-          <div className="h-16 flex items-center justify-center mb-8">
-            <div className="w-40 mt-4 h-24 bg-gray-100 rounded-lg">
+          <div className="h-16 flex items-center justify-center mb-4 mt-2">
+            <div className={`${
+              'group-hover:w-40 group-hover:h-24 w-16 h-12'
+            } bg-gray-100 rounded-lg transition-all duration-300`}>
               <img src={Image} alt="Image" className="w-full h-full object-cover rounded-lg" /> 
             </div>
           </div>
-
           <div className="flex flex-col mt-4 gap-4">
             {menuItems.map((item) => (
               <Link

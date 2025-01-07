@@ -93,11 +93,11 @@ const VideoCall = () => {
           noiseSuppression: true
         }
       });
-      console.log('✅ Media access granted successfully');
+      console.log('Media access granted successfully');
       setIsVideoEnabled(true);
       return stream;
     } catch (err) {
-      console.log(`⚠️ Media access error: ${err.name}`);
+      console.log(`Media access error: ${err.name}`);
       if (err.name === 'NotReadableError' || err.name === 'AbortError') {
         console.log('🎤 Attempting audio-only fallback...');
         const audioStream = await navigator.mediaDevices.getUserMedia({
@@ -107,7 +107,7 @@ const VideoCall = () => {
             noiseSuppression: true
           }
         });
-        console.log('✅ Audio-only stream established');
+        console.log('Audio-only stream established');
         setIsVideoEnabled(false);
         return audioStream;
       }
