@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Peer from 'simple-peer';
-import { collection, addDoc, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../Firebase';
+import { collection, addDoc, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { BsCameraVideo, BsCameraVideoOff, BsMic, BsMicMute, BsArrowLeft, BsPerson } from 'react-icons/bs';
 import { IoCall, IoCallOutline } from 'react-icons/io5';
 
@@ -14,14 +14,14 @@ const VideoCall = () => {
   const [stream, setStream] = useState(null);
   const [peer, setPeer] = useState(null);
   const [callCode, setCallCode] = useState('');
-  const [connectionCode, setConnectionCode] = useState('');
   const [isCallActive, setIsCallActive] = useState(false);
+  const [connectionCode, setConnectionCode] = useState('');
+  const [callStatus, setCallStatus] = useState('');
+  const [callDuration, setCallDuration] = useState(0);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [otherUser, setOtherUser] = useState(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-  const [callDuration, setCallDuration] = useState(0);
   const [callData, setCallData] = useState(null);
-  const [task, setTask] = useState(null);
   const myVideo = useRef();
   const remoteVideo = useRef();
   const timerRef = useRef();
@@ -31,29 +31,39 @@ const VideoCall = () => {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' }
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' }
       ]
     }
   };
-
+  const toggleAudio = () => {
+    if (stream) {
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = !isAudioEnabled;
+      });
+      setIsAudioEnabled(!isAudioEnabled);
+    }
+  };
+  
+  const toggleVideo = () => {
+    if (stream) {
+      stream.getVideoTracks().forEach(track => {
+        track.enabled = !isVideoEnabled;
+      });
+      setIsVideoEnabled(!isVideoEnabled);
+    }
+  };
   useEffect(() => {
     const fetchTaskAndUser = async () => {
       try {
-        console.log('Current User:', currentUser);
         const taskDoc = await getDoc(doc(db, 'tasks', taskId));
         if (taskDoc.exists()) {
           const taskData = taskDoc.data();
-          console.log('Task Data:', taskData);
-          setTask(taskData);
-          
           const otherUserId = taskData.client === currentUser.id ? taskData.assignee : taskData.client;
-          console.log('Other User ID:', otherUserId);
           
           const userDoc = await getDoc(doc(db, 'users', otherUserId));
           if (userDoc.exists()) {
-            const otherUserData = { id: userDoc.id, ...userDoc.data() };
-            console.log('Other User Data:', otherUserData);
-            setOtherUser(otherUserData);
+            setOtherUser({ id: userDoc.id, ...userDoc.data() });
           }
         }
       } catch (error) {
@@ -64,35 +74,38 @@ const VideoCall = () => {
     if (currentUser?.id && taskId) {
       fetchTaskAndUser();
     }
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
   }, [taskId, currentUser]);
 
-  useEffect(() => {
-    if (peer) {
-      peer.on('error', err => {
-        console.error('Peer connection error:', err);
+  const getMediaStream = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: "user"
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true
+        }
       });
-
-      peer.on('close', () => {
-        console.log('Peer connection closed');
-        endCall();
-      });
-    }
-
-    return () => {
-      if (peer) {
-        peer.destroy();
+      setIsVideoEnabled(true);
+      return stream;
+    } catch (err) {
+      if (err.name === 'NotReadableError' || err.name === 'AbortError') {
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          video: false,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true
+          }
+        });
+        setIsVideoEnabled(false);
+        return audioStream;
       }
-    };
-  }, [peer]);
+      throw err;
+    }
+  };
 
   const startTimer = () => {
     timerRef.current = setInterval(() => {
@@ -106,146 +119,108 @@ const VideoCall = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const initializeStream = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
-      setStream(mediaStream);
-      if (myVideo.current) {
-        myVideo.current.srcObject = mediaStream;
-      }
-      return mediaStream;
-    } catch (error) {
-      console.error('Media access error:', error);
-      return null;
-    }
+  const createCallSession = async (code, signalData) => {
+    await addDoc(collection(db, 'calls'), {
+      code,
+      taskId,
+      from: currentUser.id,
+      to: otherUser.id,
+      signalData,
+      type: 'offer',
+      status: 'pending',
+      timestamp: new Date().toISOString(),
+      hasVideo: isVideoEnabled
+    });
   };
 
   const startCall = async () => {
-    console.log('Starting call...');
-    const mediaStream = await initializeStream();
-    if (!mediaStream) return;
-
-    const newPeer = new Peer({
-      ...peerConfig,
-      initiator: true,
-      trickle: false,
-      stream: mediaStream
-    });
-
-    newPeer.on('signal', async data => {
-      console.log('Signaling data generated:', data.type);
-      const newCallData = {
-        taskId,
-        initiator: currentUser.id,
-        receiver: otherUser.id,
-        signal: data,
-        status: 'initiated',
-        timestamp: new Date().toISOString()
-      };
-      const docRef = await addDoc(collection(db, 'calls'), newCallData);
-      setCallCode(docRef.id);
-      setCallData(newCallData);
-      console.log('Call initiated with code:', docRef.id);
-    });
-
-    newPeer.on('connect', () => {
-      console.log('Peer connection established');
-      setIsCallActive(true);
-    });
-
-    newPeer.on('stream', remoteStream => {
-      console.log('Remote stream received');
-      if (remoteVideo.current) {
-        remoteVideo.current.srcObject = remoteStream;
-      }
-      startTimer();
-    });
-
-    setPeer(newPeer);
-  };
-
-  const joinCall = async () => {
-    console.log('Joining call...');
-    if (!connectionCode) return;
-
-    const mediaStream = await initializeStream();
-    if (!mediaStream) return;
-
     try {
-      const callDoc = await getDoc(doc(db, 'calls', connectionCode));
-      if (!callDoc.exists()) {
-        console.error('Invalid call code');
-        return;
-      }
-
-      const existingCallData = callDoc.data();
-      setCallData(existingCallData);
+      const mediaStream = await getMediaStream();
+      setStream(mediaStream);
+      myVideo.current.srcObject = mediaStream;
 
       const newPeer = new Peer({
-        ...peerConfig,
-        initiator: false,
+        initiator: true,
         trickle: false,
-        stream: mediaStream
+        stream: mediaStream,
+        ...peerConfig
       });
 
       newPeer.on('signal', async data => {
-        await updateDoc(doc(db, 'calls', connectionCode), {
-          answer: data,
-          status: 'connected',
-          answeredAt: new Date().toISOString()
-        });
-      });
-
-      newPeer.on('connect', () => {
-        console.log('Peer connection established');
-        setIsCallActive(true);
+        const code = Math.random().toString(36).substring(2);
+        setCallCode(code);
+        await createCallSession(code, data);
       });
 
       newPeer.on('stream', remoteStream => {
-        console.log('Remote stream received');
-        if (remoteVideo.current) {
-          remoteVideo.current.srcObject = remoteStream;
-        }
+        remoteVideo.current.srcObject = remoteStream;
+        setIsCallActive(true);
+        setCallStatus('Connected');
         startTimer();
       });
 
-      newPeer.signal(existingCallData.signal);
       setPeer(newPeer);
-    } catch (error) {
-      console.error('Error joining call:', error);
+    } catch (err) {
+      console.error('Error starting call:', err);
+      setCallStatus('Failed to start call');
     }
   };
 
-  const toggleAudio = () => {
-    if (stream) {
-      stream.getAudioTracks().forEach(track => {
-        track.enabled = !isAudioEnabled;
-      });
-      setIsAudioEnabled(!isAudioEnabled);
-    }
-  };
+  const joinCall = async () => {
+    try {
+      const mediaStream = await getMediaStream();
+      setStream(mediaStream);
+      myVideo.current.srcObject = mediaStream;
 
-  const toggleVideo = () => {
-    if (stream) {
-      stream.getVideoTracks().forEach(track => {
-        track.enabled = !isVideoEnabled;
+      const callQuery = query(
+        collection(db, 'calls'),
+        where('code', '==', connectionCode),
+        where('type', '==', 'offer')
+      );
+
+      const snapshot = await getDocs(callQuery);
+      const callData = snapshot.docs[0]?.data();
+
+      if (!callData) {
+        setCallStatus('Invalid call code');
+        return;
+      }
+
+      const newPeer = new Peer({
+        initiator: false,
+        trickle: false,
+        stream: mediaStream,
+        ...peerConfig
       });
-      setIsVideoEnabled(!isVideoEnabled);
+
+      newPeer.on('signal', async data => {
+        await addDoc(collection(db, 'calls'), {
+          code: connectionCode,
+          taskId,
+          from: currentUser.id,
+          to: callData.from,
+          signalData: data,
+          type: 'answer',
+          timestamp: new Date().toISOString()
+        });
+      });
+
+      newPeer.on('stream', remoteStream => {
+        remoteVideo.current.srcObject = remoteStream;
+        setIsCallActive(true);
+        setCallStatus('Connected');
+        startTimer();
+      });
+
+      newPeer.signal(callData.signalData);
+      setPeer(newPeer);
+    } catch (err) {
+      console.error('Error joining call:', err);
+      setCallStatus('Failed to join call');
     }
   };
 
   const endCall = async () => {
-    console.log('Ending call...');
-    if (callCode) {
-      await updateDoc(doc(db, 'calls', callCode), {
-        status: 'ended',
-        endedAt: new Date().toISOString()
-      });
-    }
-
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
     }
@@ -256,12 +231,43 @@ const VideoCall = () => {
       clearInterval(timerRef.current);
     }
 
+    const code = callCode || connectionCode;
+    if (code) {
+      const callQuery = query(collection(db, 'calls'), where('code', '==', code));
+      const snapshot = await getDocs(callQuery);
+      await Promise.all(
+        snapshot.docs.map(doc => 
+          updateDoc(doc.ref, { 
+            status: 'ended',
+            endedAt: new Date().toISOString()
+          })
+        )
+      );
+    }
+
     setIsCallActive(false);
+    setStream(null);
+    setPeer(null);
+    setCallCode('');
+    setConnectionCode('');
+    setCallStatus('');
     setCallDuration(0);
-    console.log('Call ended successfully');
+
     navigate(`/dashboard/chat/${taskId}`);
   };
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  // Your existing JSX return remains the same
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="bg-white border-b border-gray-200 p-4 mb-4">
