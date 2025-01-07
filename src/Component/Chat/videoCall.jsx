@@ -31,10 +31,16 @@ const VideoCall = () => {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' }
-      ]
+        {
+          urls: 'turn:your-turn-server.com:3478',
+          username: 'your-username',
+          credential: 'your-password'
+        }
+      ],
+      iceCandidatePoolSize: 10
     }
   };
+  
 
   useEffect(() => {
     const fetchTaskAndUser = async () => {
@@ -225,6 +231,14 @@ const VideoCall = () => {
           remoteVideo.current.srcObject = remoteStream;
         }
       });
+      newPeer.on('iceStateChange', (state) => {
+        console.log('🧊 ICE State:', state);
+      });
+      
+      newPeer.on('iceCandidate', (candidate) => {
+        console.log('🎯 ICE Candidate:', candidate);
+      });
+      
 
       newPeer.signal(callData.signalData);
       setPeer(newPeer);
