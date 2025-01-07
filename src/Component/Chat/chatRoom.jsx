@@ -109,83 +109,84 @@ const ChatRoom = () => {
     navigate(`/call/${taskId}/${otherUserId}`);
   };
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
-      <div className="bg-white border-b border-gray-200 p-4">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => navigate('/dashboard')} 
-            className="text-gray-600 hover:text-gray-800"
-          >
-            <BsArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h2 className="text-lg font-semibold text-gray-800">{task?.title}</h2>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <BsPerson className="w-4 h-4" />
-              <span>
-                {otherUser?.username || otherUser?.clientName || 'Loading...'}
-                {' - '}
-                {otherUser?.userType === 'client' ? 'Client' : 'Assignee'}
-              </span>
-            </div>
-          </div>
-          <button
-              onClick={startCall}
-              className="p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200"
-            >
-              <IoCallOutline className="text-xl" />
+    <div className="h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header */}
+      <div className="bg-white border-b shadow-sm p-4">
+        <div className="max-w-3xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate('/dashboard')} className="p-2 hover:bg-gray-100 rounded-full">
+              <BsArrowLeft className="w-5 h-5" />
             </button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[70%] rounded-lg p-3 ${
-                message.senderId === currentUser.id
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-white text-gray-800'
-              } shadow-sm`}
-            >
-              <div className="text-xs text-gray-500 mb-1">
-                {message.senderId === currentUser.id ? 'You' : message.senderName}
-              </div>
-              <div className="text-sm break-words">{message.text}</div>
-              <div className="text-xs text-gray-500 mt-1">
-                {new Date(message.timestamp).toLocaleTimeString([], { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
+            <div>
+              <h2 className="font-medium text-gray-900">{task?.title}</h2>
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <BsPerson className="w-4 h-4" />
+                {otherUser?.username || otherUser?.clientName}
               </div>
             </div>
           </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-
-      <form onSubmit={handleSubmit} className="bg-white border-t border-gray-200 p-4">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-green-500"
-          />
           <button
-            type="submit"
-            disabled={!newMessage.trim() || !otherUser}
-            className="bg-green-500 text-white rounded-lg px-4 py-2 hover:bg-green-600 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={startCall}
+            className="p-3 rounded-full bg-green-100 text-green-600 hover:bg-green-200"
           >
-            <IoSend className="w-4 h-4" />
-            <span>Send</span>
+            <IoCallOutline className="text-xl" />
           </button>
         </div>
-      </form>
+      </div>
+  
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="max-w-3xl mx-auto space-y-4">
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={`flex ${message.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[70%] rounded-2xl p-4 ${
+                  message.senderId === currentUser.id
+                    ? 'bg-green-500 text-white'
+                    : 'bg-white shadow-sm'
+                }`}
+              >
+                <div className="text-xs opacity-75 mb-1">
+                  {message.senderId === currentUser.id ? 'You' : message.senderName}
+                </div>
+                <div className="text-sm">{message.text}</div>
+                <div className="text-xs opacity-75 mt-1 text-right">
+                  {new Date(message.timestamp).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+  
+      {/* Message Input */}
+      <div className="bg-white border-t p-4">
+        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 px-4 py-3 rounded-full bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              type="submit"
+              disabled={!newMessage.trim()}
+              className="p-3 rounded-full bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <IoSend className="w-5 h-5" />
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

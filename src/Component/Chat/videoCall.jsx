@@ -353,89 +353,104 @@ const VideoCall = () => {
   }, []);
 
   return (
-    <div className="h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
-      <div className="grid grid-cols-2 gap-4 w-full max-w-4xl">
-        <div className="relative aspect-video">
-          <video
-            ref={myVideo}
-            autoPlay
-            muted
-            playsInline
-            className={`w-full h-full object-cover rounded-lg ${!isVideoEnabled ? 'hidden' : ''}`}
-          />
-          {!isVideoEnabled && (
-            <div className="w-full h-full bg-gray-700 rounded-lg flex items-center justify-center">
-              <span className="text-white">Audio Only</span>
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl aspect-video bg-gray-800">
+            <video
+              ref={myVideo}
+              autoPlay
+              muted
+              playsInline
+              className={`w-full h-full object-cover ${!isVideoEnabled ? 'hidden' : ''}`}
+            />
+            {!isVideoEnabled && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-700">
+                <div className="flex flex-col items-center">
+                  <div className="w-20 h-20 rounded-full bg-gray-600 flex items-center justify-center">
+                    <span className="text-3xl text-gray-300">
+                      {(currentUser.fullName || currentUser.clientName)?.charAt(0)}
+                    </span>
+                  </div>
+                  <span className="mt-3 text-gray-300">Audio Only</span>
+                </div>
+              </div>
+            )}
+            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-lg">
+              You ({currentUser.fullName || currentUser.clientName})
             </div>
-          )}
-          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
-            You ({currentUser.fullName || currentUser.clientName})
           </div>
-        </div>
-        <div className="relative aspect-video">
-          <video
-            ref={remoteVideo}
-            autoPlay
-            playsInline
-            className={`w-full h-full object-cover rounded-lg ${!isVideoEnabled ? 'hidden' : ''}`}
-          />
-          {!isVideoEnabled && (
-            <div className="w-full h-full bg-gray-700 rounded-lg flex items-center justify-center">
-              <span className="text-white">Audio Only</span>
+
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl aspect-video bg-gray-800">
+            <video
+              ref={remoteVideo}
+              autoPlay
+              playsInline
+              className={`w-full h-full object-cover ${!isVideoEnabled ? 'hidden' : ''}`}
+            />
+            {!isVideoEnabled && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-700">
+                <div className="flex flex-col items-center">
+                  <div className="w-20 h-20 rounded-full bg-gray-600 flex items-center justify-center">
+                    <span className="text-3xl text-gray-300">
+                      {remoteUserName?.charAt(0)}
+                    </span>
+                  </div>
+                  <span className="mt-3 text-gray-300">Audio Only</span>
+                </div>
+              </div>
+            )}
+            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-lg">
+              {remoteUserName || 'Remote User'}
             </div>
-          )}
-          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
-            {remoteUserName || 'Remote User'}
           </div>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-col items-center gap-4">
+      <div className="mt-8 w-full max-w-xl mx-auto">
         {callStatus && (
-          <div className={`text-sm ${callStatus === 'Connected' ? 'text-green-500' : 'text-red-500'}`}>
-            {callStatus}
+          <div className={`text-center mb-4 ${callStatus === 'Connected' ? 'text-emerald-400' : 'text-rose-400'}`}>
+            <span className="px-4 py-2 rounded-full bg-gray-800/50 backdrop-blur-sm">
+              {callStatus}
+              {callDuration > 0 && ` • ${formatDuration(callDuration)}`}
+            </span>
           </div>
         )}
 
-        {callDuration > 0 && (
-          <div className="text-white">
-            Duration: {formatDuration(callDuration)}
-          </div>
-        )}
-
-        <div className="flex gap-4">
-          {!isCallActive && (
-            <>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          {!isCallActive && !isInitiator && (
+            <div className="flex w-full sm:w-auto gap-3">
+              <input
+                type="text"
+                value={connectionCode}
+                onChange={(e) => setConnectionCode(e.target.value)}
+                placeholder="Enter call code"
+                className="flex-1 px-6 py-3 rounded-xl bg-gray-700 text-white border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
               <button
-                onClick={startCall}
-                className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+                onClick={joinCall}
+                className="px-6 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors duration-200 flex items-center gap-2"
               >
                 <PhoneIcon className="h-5 w-5" />
-                Start Call
+                Join
               </button>
+            </div>
+          )}
 
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={connectionCode}
-                  onChange={(e) => setConnectionCode(e.target.value)}
-                  placeholder="Enter call code"
-                  className="px-4 py-2 rounded-lg border"
-                />
-                <button
-                  onClick={joinCall}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
-                >
-                  Join Call
-                </button>
-              </div>
-            </>
+          {!isCallActive && !connectionCode && (
+            <button
+              onClick={startCall}
+              className="w-full sm:w-auto px-8 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-medium transition-colors duration-200 flex items-center justify-center gap-2"
+            >
+              <PhoneIcon className="h-5 w-5" />
+              Start Call
+            </button>
           )}
 
           {isCallActive && (
             <button
               onClick={endCall}
-              className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+              className="px-8 py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-medium transition-colors duration-200 flex items-center gap-2"
             >
               <PhoneXMarkIcon className="h-5 w-5" />
               End Call
@@ -444,9 +459,9 @@ const VideoCall = () => {
         </div>
 
         {callCode && isInitiator && (
-          <div className="mt-4 bg-white p-4 rounded-lg">
-            <p className="text-center">Share this code to join:</p>
-            <p className="text-xl font-bold mt-2">{callCode}</p>
+          <div className="mt-6 bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl text-center">
+            <p className="text-gray-300 mb-2">Share this code to join the call</p>
+            <p className="text-2xl font-mono font-bold text-white tracking-wider">{callCode}</p>
           </div>
         )}
       </div>
