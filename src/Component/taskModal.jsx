@@ -6,13 +6,15 @@ import { CiCalendar } from "react-icons/ci";
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from './Firebase';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { FiMessageSquare } from 'react-icons/fi';
 
 const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEditingTask }) => {
   const [activeTab, setActiveTab] = useState('subtasks');
   const [users, setUsers] = useState([]);
   const [clients, setClients] = useState([]);
   const navigate = useNavigate();
-
+  const user = useSelector(state => state.auth.currentUser);
   const getAssigneeName = () => {
     const assignee = users.find(user => user.id === task.assignee);
     return assignee ? assignee.username : 'Not Assigned';
@@ -211,14 +213,16 @@ const TaskModal = ({ task, onClose, handleCompleteTask, handleDeleteTask, setEdi
                 Complete Task
               </button>
               <button
-                onClick={() => {
-                  navigate(`/dashboard/chat/${task.id}`);
-                  onClose();
-                }}
-                className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 flex items-center gap-2"
-              >
-                Chat
-              </button>
+  onClick={() => {
+    navigate(`/dashboard/chat/${task.id}`);
+    onClose();
+  }}
+  className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 flex items-center gap-2"
+>
+  <FiMessageSquare className="text-lg" />
+  Chat with {task.client === user.id ? getAssigneeName() : getClientName()}
+</button>
+
             </div>
           </div>
         </div>

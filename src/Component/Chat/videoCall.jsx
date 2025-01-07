@@ -2,346 +2,59 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Peer from 'simple-peer';
-import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../Firebase';
-import { PhoneIcon, PhoneXMarkIcon } from '@heroicons/react/24/solid';
-import { Buffer } from 'buffer';
-window.Buffer = Buffer;
-window.process = require('process/browser');
+import { BsCameraVideo, BsCameraVideoOff, BsMic, BsMicMute, BsArrowLeft, BsPerson } from 'react-icons/bs';
+import { IoCall, IoCallOutline } from 'react-icons/io5';
 
 const VideoCall = () => {
   const { taskId } = useParams();
   const navigate = useNavigate();
   const currentUser = useSelector(state => state.auth.currentUser);
   const [stream, setStream] = useState(null);
+  const [task, setTask] = useState(null);
   const [peer, setPeer] = useState(null);
   const [callCode, setCallCode] = useState('');
-  const [isCallActive, setIsCallActive] = useState(false);
   const [connectionCode, setConnectionCode] = useState('');
-  const [isInitiator, setIsInitiator] = useState(false);
-  const [callStatus, setCallStatus] = useState('');
-  const [callDuration, setCallDuration] = useState(0);
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [otherUser, setOtherUser] = useState(null);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-  const [taskData, setTaskData] = useState(null);
-  const [otherUserId, setOtherUserId] = useState(null);
-  const [remoteUserName, setRemoteUserName] = useState('');
+  const [callDuration, setCallDuration] = useState(0);
+  const [callData, setCallData] = useState(null);
   const myVideo = useRef();
   const remoteVideo = useRef();
-  const connectionRef = useRef();
   const timerRef = useRef();
 
   useEffect(() => {
-    const getTaskData = async () => {
+    const fetchTaskAndUser = async () => {
       try {
-        const taskRef = doc(db, 'tasks', taskId);
-        const taskDoc = await getDoc(taskRef);
-        
+        console.log('Current User:', currentUser);
+        const taskDoc = await getDoc(doc(db, 'tasks', taskId));
         if (taskDoc.exists()) {
-          const data = taskDoc.data();
-          setTaskData(data);
-          const otherId = currentUser.id === data.client ? data.assignee : data.client;
-          setOtherUserId(otherId);
-          console.log('Task and user data loaded:', { taskId, otherId });
+          const taskData = taskDoc.data();
+          console.log('Task Data:', taskData);
+          setTask(taskData);
+          
+          const otherUserId = taskData.client === currentUser.id ? taskData.assignee : taskData.client;
+          console.log('Other User ID:', otherUserId);
+          
+          const userDoc = await getDoc(doc(db, 'users', otherUserId));
+          if (userDoc.exists()) {
+            const otherUserData = { id: userDoc.id, ...userDoc.data() };
+            console.log('Other User Data:', otherUserData);
+            setOtherUser(otherUserData);
+          }
         }
-      } catch (err) {
-        console.error('Error fetching task data:', err);
+      } catch (error) {
+        console.error('Error fetching data:', error);
       }
     };
 
-    getTaskData();
-  }, [taskId, currentUser]);
-  useEffect(() => {
-    const getRemoteUserName = async () => {
-      if (otherUserId) {
-        const userRef = doc(db, 'users', otherUserId);
-        const userDoc = await getDoc(userRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          setRemoteUserName(userData.fullName || userData.clientName);
-        }
-      }
-    };
-    getRemoteUserName();
-  }, [otherUserId]);
-  useEffect(() => {
-    if (isCallActive) {
-      const code = callCode || connectionCode;
-      const unsubscribe = onSnapshot(
-        query(collection(db, 'activeCalls'), where('code', '==', code)),
-        (snapshot) => {
-          snapshot.forEach((doc) => {
-            if (doc.data().status === 'ended') {
-              endCall();
-            }
-          });
-        }
-      );
-      return () => unsubscribe();
-    }
-  }, [isCallActive]);
-  const getMediaStream = async () => {
-    console.log('🎥 Requesting media access...');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: "user"
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true
-        }
-      });
-      console.log('✅ Media access granted successfully');
-      setIsVideoEnabled(true);
-      return stream;
-    } catch (err) {
-      console.log(`⚠️ Media access error: ${err.name}`);
-      if (err.name === 'NotReadableError' || err.name === 'AbortError') {
-        console.log('🎤 Attempting audio-only fallback...');
-        const audioStream = await navigator.mediaDevices.getUserMedia({
-          video: false,
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true
-          }
-        });
-        console.log('✅ Audio-only stream established');
-        setIsVideoEnabled(false);
-        return audioStream;
-      }
-      throw err;
-    }
-  };
-
-  const startTimer = () => {
-    if (!timerRef.current) {
-      timerRef.current = setInterval(() => {
-        setCallDuration(prev => prev + 1);
-      }, 1000);
-    }
-  };
-
-  const formatDuration = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const createCallSession = async (code, signalData) => {
-    if (!otherUserId) {
-      console.error('Cannot create call: Other user not found');
-      return;
+    if (currentUser?.id && taskId) {
+      fetchTaskAndUser();
     }
 
-    await addDoc(collection(db, 'activeCalls'), {
-      code,
-      taskId,
-      initiator: currentUser.id,
-      receiver: otherUserId,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      hasVideo: isVideoEnabled
-    });
-
-    await addDoc(collection(db, 'calls'), {
-      code,
-      taskId,
-      from: currentUser.id,
-      to: otherUserId,
-      signalData,
-      type: 'offer',
-      timestamp: new Date().toISOString()
-    });
-  };
-
-  const startCall = async () => {
-    if (!otherUserId) {
-      setCallStatus('Cannot start call: Other user not found');
-      return;
-    }
-
-    try {
-      const mediaStream = await getMediaStream();
-      setStream(mediaStream);
-      if (myVideo.current) {
-        myVideo.current.srcObject = mediaStream;
-      }
-
-      const newPeer = new Peer({
-        initiator: true,
-        trickle: false,
-        stream: mediaStream,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' }
-          ]
-        }
-      });
-
-      newPeer.on('signal', async (data) => {
-        const code = Math.random().toString(36).substring(2);
-        setCallCode(code);
-        await createCallSession(code, data);
-      });
-
-      newPeer.on('stream', (remoteStream) => {
-        if (remoteVideo.current) {
-          remoteVideo.current.srcObject = remoteStream;
-          remoteVideo.current.play().catch(err => console.log('Remote video play error:', err));
-        }
-        setIsCallActive(true);
-        setCallStatus('Connected');
-        startTimer();
-      });
-
-      newPeer.on('connect', () => {
-        setCallStatus('Connected');
-        startTimer();
-      });
-
-      setPeer(newPeer);
-      connectionRef.current = newPeer;
-      setIsInitiator(true);
-    } catch (err) {
-      console.error('Error starting call:', err);
-      setCallStatus('Failed to start call');
-    }
-  };
-
-  const joinCall = async () => {
-    try {
-      const mediaStream = await getMediaStream();
-      setStream(mediaStream);
-      if (myVideo.current) {
-        myVideo.current.srcObject = mediaStream;
-      }
-
-      const offerQuery = query(
-        collection(db, 'calls'),
-        where('code', '==', connectionCode),
-        where('type', '==', 'offer'),
-        limit(1)
-      );
-
-      const unsubscribe = onSnapshot(offerQuery, (snapshot) => {
-        const offerData = snapshot.docs[0]?.data();
-        if (!offerData) return;
-
-        const newPeer = new Peer({
-          initiator: false,
-          trickle: false,
-          stream: mediaStream,
-          config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:global.stun.twilio.com:3478' }
-            ]
-          }
-        });
-
-        newPeer.on('signal', async (signalData) => {
-          await addDoc(collection(db, 'calls'), {
-            code: connectionCode,
-            taskId,
-            from: currentUser.id,
-            to: offerData.from,
-            signalData,
-            type: 'answer',
-            timestamp: new Date().toISOString()
-          });
-        });
-
-        newPeer.on('stream', (remoteStream) => {
-          if (remoteVideo.current) {
-            remoteVideo.current.srcObject = remoteStream;
-            remoteVideo.current.play().catch(err => console.log('Remote video play error:', err));
-          }
-          setIsCallActive(true);
-          setCallStatus('Connected');
-          startTimer();
-        });
-
-        newPeer.signal(offerData.signalData);
-        setPeer(newPeer);
-        connectionRef.current = newPeer;
-      });
-
-      return () => unsubscribe();
-    } catch (err) {
-      console.error('Error joining call:', err);
-      setCallStatus('Failed to join call');
-    }
-  };
-
-  useEffect(() => {
-    if (isInitiator && peer) {
-      const answerQuery = query(
-        collection(db, 'calls'),
-        where('code', '==', callCode),
-        where('type', '==', 'answer'),
-        limit(1)
-      );
-
-      const unsubscribe = onSnapshot(answerQuery, (snapshot) => {
-        snapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          if (peer && data.from !== currentUser.id) {
-            peer.signal(data.signalData);
-          }
-        });
-      });
-
-      return () => unsubscribe();
-    }
-  }, [isInitiator, peer, callCode, currentUser.id]);
-
-  const endCall = async () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-    }
-    if (connectionRef.current) {
-      connectionRef.current.destroy();
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
-    const code = callCode || connectionCode;
-    if (code) {
-      const activeCallQuery = query(
-        collection(db, 'activeCalls'),
-        where('code', '==', code)
-      );
-      const snapshot = await getDocs(activeCallQuery);
-      await Promise.all(
-        snapshot.docs.map(doc => 
-          updateDoc(doc.ref, { 
-            status: 'ended',
-            endedAt: new Date().toISOString()
-          })
-        )
-      );
-    }
-
-    setIsCallActive(false);
-    setStream(null);
-    setPeer(null);
-    setCallCode('');
-    setConnectionCode('');
-    setIsInitiator(false);
-    setCallStatus('');
-    setCallDuration(0);
-    
-    if (myVideo.current) myVideo.current.srcObject = null;
-    if (remoteVideo.current) remoteVideo.current.srcObject = null;
-
-    navigate(`/dashboard/chat/${taskId}`);
-  };
-
-  useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -350,103 +63,279 @@ const VideoCall = () => {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, [taskId, currentUser]);
+
+  const startTimer = () => {
+    timerRef.current = setInterval(() => {
+      setCallDuration(prev => prev + 1);
+    }, 1000);
+  };
+
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const initializeStream = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      setStream(mediaStream);
+      if (myVideo.current) {
+        myVideo.current.srcObject = mediaStream;
+      }
+      return mediaStream;
+    } catch (error) {
+      console.error('Media access error:', error);
+      return null;
+    }
+  };
+
+  const startCall = async () => {
+    console.log('Starting call...');
+    const mediaStream = await initializeStream();
+    if (!mediaStream) return;
+
+    const newPeer = new Peer({
+      initiator: true,
+      trickle: false,
+      stream: mediaStream
+    });
+
+    newPeer.on('signal', async data => {
+      const newCallData = {
+        taskId,
+        initiator: currentUser.id,
+        receiver: otherUser.id,
+        signal: data,
+        status: 'initiated',
+        timestamp: new Date().toISOString()
+      };
+      const docRef = await addDoc(collection(db, 'calls'), newCallData);
+      setCallCode(docRef.id);
+      setCallData(newCallData);
+      console.log('Call initiated with code:', docRef.id);
+    });
+
+    newPeer.on('stream', remoteStream => {
+      console.log('Received remote stream');
+      if (remoteVideo.current) {
+        remoteVideo.current.srcObject = remoteStream;
+      }
+      setIsCallActive(true);
+      startTimer();
+    });
+
+    setPeer(newPeer);
+  };
+
+  const joinCall = async () => {
+    console.log('Joining call...');
+    if (!connectionCode) return;
+
+    const mediaStream = await initializeStream();
+    if (!mediaStream) return;
+
+    try {
+      const callDoc = await getDoc(doc(db, 'calls', connectionCode));
+      if (!callDoc.exists()) {
+        console.error('Invalid call code');
+        return;
+      }
+
+      const callData = callDoc.data();
+      setCallData(callData);
+
+      const newPeer = new Peer({
+        initiator: false,
+        trickle: false,
+        stream: mediaStream
+      });
+
+      newPeer.on('signal', async data => {
+        await updateDoc(doc(db, 'calls', connectionCode), {
+          answer: data,
+          status: 'connected',
+          answeredAt: new Date().toISOString()
+        });
+      });
+
+      newPeer.on('stream', remoteStream => {
+        if (remoteVideo.current) {
+          remoteVideo.current.srcObject = remoteStream;
+        }
+        setIsCallActive(true);
+        startTimer();
+      });
+
+      newPeer.signal(callData.signal);
+      setPeer(newPeer);
+    } catch (error) {
+      console.error('Error joining call:', error);
+    }
+  };
+
+  const toggleAudio = () => {
+    if (stream) {
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = !isAudioEnabled;
+      });
+      setIsAudioEnabled(!isAudioEnabled);
+    }
+  };
+
+  const toggleVideo = () => {
+    if (stream) {
+      stream.getVideoTracks().forEach(track => {
+        track.enabled = !isVideoEnabled;
+      });
+      setIsVideoEnabled(!isVideoEnabled);
+    }
+  };
+
+  const endCall = async () => {
+    console.log('Ending call...');
+    if (callCode) {
+      await updateDoc(doc(db, 'calls', callCode), {
+        status: 'ended',
+        endedAt: new Date().toISOString()
+      });
+    }
+
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    if (peer) {
+      peer.destroy();
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    setIsCallActive(false);
+    setCallDuration(0);
+    console.log('Call ended successfully');
+    navigate(`/dashboard/chat/${taskId}`);
+  };
 
   return (
-    <div className="h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
-      <div className="grid grid-cols-2 gap-4 w-full max-w-4xl">
-        <div className="relative aspect-video">
-          <video
-            ref={myVideo}
-            autoPlay
-            muted
-            playsInline
-            className={`w-full h-full object-cover rounded-lg ${!isVideoEnabled ? 'hidden' : ''}`}
-          />
-          {!isVideoEnabled && (
-            <div className="w-full h-full bg-gray-700 rounded-lg flex items-center justify-center">
-              <span className="text-white">Audio Only</span>
+    <div className="min-h-screen bg-gray-100">
+      <div className="bg-white border-b border-gray-200 p-4 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => navigate('/dashboard')}
+              className="text-gray-600 hover:text-gray-800"
+            >
+              <BsArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">Video Call</h2>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <BsPerson className="w-4 h-4" />
+                <span>{otherUser?.username || otherUser?.clientName || 'Loading...'}</span>
+              </div>
             </div>
-          )}
-          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
-            You ({currentUser.fullName || currentUser.clientName})
-          </div>
-        </div>
-        <div className="relative aspect-video">
-          <video
-            ref={remoteVideo}
-            autoPlay
-            playsInline
-            className={`w-full h-full object-cover rounded-lg ${!isVideoEnabled ? 'hidden' : ''}`}
-          />
-          {!isVideoEnabled && (
-            <div className="w-full h-full bg-gray-700 rounded-lg flex items-center justify-center">
-              <span className="text-white">Audio Only</span>
-            </div>
-          )}
-          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
-            {remoteUserName || 'Remote User'}
           </div>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-col items-center gap-4">
-        {callStatus && (
-          <div className={`text-sm ${callStatus === 'Connected' ? 'text-green-500' : 'text-red-500'}`}>
-            {callStatus}
-          </div>
-        )}
-
-        {callDuration > 0 && (
-          <div className="text-white">
-            Duration: {formatDuration(callDuration)}
-          </div>
-        )}
-
-        <div className="flex gap-4">
-          {!isCallActive && (
-            <>
+      {!isCallActive && (
+        <div className="bg-white p-6 rounded-lg shadow-sm mx-4 mb-4">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <button
+              onClick={startCall}
+              className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2"
+            >
+              <IoCall className="w-5 h-5" />
+              Start New Call
+            </button>
+            
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={connectionCode}
+                onChange={(e) => setConnectionCode(e.target.value)}
+                placeholder="Enter call code"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-green-500"
+              />
               <button
-                onClick={startCall}
-                className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+                onClick={joinCall}
+                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
               >
-                <PhoneIcon className="h-5 w-5" />
-                Start Call
+                Join Call
               </button>
-
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={connectionCode}
-                  onChange={(e) => setConnectionCode(e.target.value)}
-                  placeholder="Enter call code"
-                  className="px-4 py-2 rounded-lg border"
-                />
-                <button
-                  onClick={joinCall}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
-                >
-                  Join Call
-                </button>
-              </div>
-            </>
+            </div>
+          </div>
+          
+          {callCode && (
+            <div className="mt-4 text-center">
+              <p className="text-gray-600">Share this code to join the call:</p>
+              <p className="text-xl font-bold text-gray-800 mt-2">{callCode}</p>
+            </div>
           )}
+        </div>
+      )}
 
-          {isCallActive && (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+        <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+          <video
+            ref={myVideo}
+            muted
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute bottom-4 left-4 text-white bg-black bg-opacity-50 px-2 py-1 rounded">
+            You
+          </div>
+        </div>
+        
+        <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+          <video
+            ref={remoteVideo}
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute bottom-4 left-4 text-white bg-black bg-opacity-50 px-2 py-1 rounded">
+            {otherUser?.username || otherUser?.clientName}
+          </div>
+        </div>
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
+        <div className="flex justify-center gap-4">
+          <button
+            onClick={toggleAudio}
+            className={`p-4 rounded-full ${isAudioEnabled ? 'bg-gray-200' : 'bg-red-500 text-white'}`}
+          >
+            {isAudioEnabled ? <BsMic size={24} /> : <BsMicMute size={24} />}
+          </button>
+
+          <button
+            onClick={toggleVideo}
+            className={`p-4 rounded-full ${isVideoEnabled ? 'bg-gray-200' : 'bg-red-500 text-white'}`}
+          >
+            {isVideoEnabled ? <BsCameraVideo size={24} /> : <BsCameraVideoOff size={24} />}
+          </button>
+
+          {(isCallActive || (callData && currentUser.id === callData.initiator)) && (
             <button
               onClick={endCall}
-              className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+              className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600"
             >
-              <PhoneXMarkIcon className="h-5 w-5" />
-              End Call
+              <IoCallOutline size={24} />
             </button>
           )}
         </div>
 
-        {callCode && isInitiator && (
-          <div className="mt-4 bg-white p-4 rounded-lg">
-            <p className="text-center">Share this code to join:</p>
-            <p className="text-xl font-bold mt-2">{callCode}</p>
+        {callDuration > 0 && (
+          <div className="text-center text-gray-600 mt-2">
+            {formatDuration(callDuration)}
           </div>
         )}
       </div>

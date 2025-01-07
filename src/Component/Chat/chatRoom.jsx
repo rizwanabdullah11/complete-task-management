@@ -1,56 +1,59 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { db } from '../Firebase';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
-import { FiSend } from 'react-icons/fi';
-import { BsPerson } from 'react-icons/bs';
-import { FaArrowLeft } from 'react-icons/fa';
-import { IoCallOutline } from 'react-icons/io5';
+import { db } from '../Firebase';
 import { useSelector } from 'react-redux';
+import { BsArrowLeft, BsPerson } from 'react-icons/bs';
+import { IoSend } from 'react-icons/io5';
+import { IoCallOutline } from 'react-icons/io5';
 
 const ChatRoom = () => {
   const { taskId } = useParams();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [taskTitle, setTaskTitle] = useState('');
-  const [otherUserId, setOtherUserId] = useState(null);
   const [task, setTask] = useState(null);
-  const user = useSelector(state => state.auth.currentUser);
+  const [otherUser, setOtherUser] = useState(null);
+  const [otherUserId, setOtherUserId] = useState(null);
   const messagesEndRef = useRef(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const currentUser = useSelector(state => state.auth.currentUser);
 
   useEffect(() => {
-    const chatRef = doc(db, 'taskChats', taskId);
-    
-    const initializeChat = async () => {
-      const getTaskRef = doc(db, 'tasks', taskId);
-      const getTask = await getDoc(getTaskRef);
-
-      if(getTask.data()) {
-        setTask(getTask.data());
-        setTaskTitle(getTask.data().title);
-        const definetheser = getTask.data()?.client === user.userId ? getTask.data()?.assignee : getTask.data()?.client;
-        setOtherUserId(definetheser);
-
-        const chatDoc = await getDoc(chatRef);
-        if (!chatDoc.exists()) {
-          await setDoc(chatRef, {
-            messages: [],
-            participants: [user.userId, definetheser],
-            taskId: taskId,
-            createdAt: new Date().toISOString()
-          });
+    const fetchTaskAndUsers = async () => {
+      try {
+        console.log('Current User:', currentUser);
+        const taskDoc = await getDoc(doc(db, 'tasks', taskId));
+        if (taskDoc.exists()) {
+          const taskData = taskDoc.data();
+          console.log('Task Data:', taskData);
+          setTask(taskData);
+          
+          const otherUserId = taskData.client === currentUser.id 
+            ? taskData.assignee 
+            : taskData.client;
+          console.log('Other User ID:', otherUserId);
+          
+          const otherUserDoc = await getDoc(doc(db, 'users', otherUserId));
+          if (otherUserDoc.exists()) {
+            const otherUserData = { id: otherUserDoc.id, ...otherUserDoc.data() };
+            console.log('Other User Data:', otherUserData);
+            setOtherUser(otherUserData);
+          }
         }
+      } catch (error) {
+        console.log('Error fetching data:', error);
       }
     };
 
-    initializeChat();
+    if (currentUser?.id && taskId) {
+      fetchTaskAndUsers();
+    }
+  }, [taskId, currentUser]);
 
-    const unsubscribe = onSnapshot(chatRef, (doc) => {
+  useEffect(() => {
+    const chatDocRef = doc(db, 'taskChats', taskId);
+    
+    const unsubscribe = onSnapshot(chatDocRef, (doc) => {
       if (doc.exists()) {
         const chatData = doc.data();
         setMessages(chatData.messages || []);
@@ -61,151 +64,128 @@ const ChatRoom = () => {
     return () => unsubscribe();
   }, [taskId]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (newMessage.trim()) {
-      const chatRef = doc(db, 'taskChats', taskId);
-      
+    if (!newMessage.trim() || !otherUser) return;
+
+    try {
+      const chatDocRef = doc(db, 'taskChats', taskId);
+      const chatDoc = await getDoc(chatDocRef);
+
       const messageData = {
         text: newMessage,
-        sender: user.userId,
+        senderId: currentUser.id,
+        senderName: currentUser.username || currentUser.clientName,
+        senderType: currentUser.userType,
+        receiverId: otherUser.id,
+        receiverName: otherUser.username || otherUser.clientName,
+        receiverType: otherUser.userType,
         timestamp: new Date().toISOString(),
-        id: Date.now().toString()
+        read: false
       };
 
-      await updateDoc(chatRef, {
-        messages: arrayUnion(messageData)
-      });
-
+      if (chatDoc.exists()) {
+        await updateDoc(chatDocRef, {
+          messages: arrayUnion(messageData)
+        });
+      } else {
+        await setDoc(chatDocRef, {
+          taskId: taskId,
+          participants: [currentUser.id, otherUser.id],
+          messages: [messageData]
+        });
+      }
+      
       setNewMessage('');
+    } catch (error) {
+      console.log('Send message error:', error);
     }
   };
-
-  // const startCall = async () => {
-  //   console.log('Starting call...');
-    
-  //   const otherUserId = task?.client === user.userId ? task?.assignee : task?.client;
-    
-  //   if (otherUserId && user) {
-  //     // Create a new call document
-  //     const callData = {
-  //       callId: Date.now().toString(),
-  //       caller: {
-  //         id: user.userId,
-  //         name: user.name || 'Unknown User',
-  //         type: user.userType
-  //       },
-  //       receiver: {
-  //         id: otherUserId
-  //       },
-  //       taskId: taskId,
-  //       taskTitle: task.title,
-  //       status: 'initiating',
-  //       timestamp: new Date().toISOString(),
-  //       participants: [user.userId, otherUserId]
-  //     };
-  
-  //     // Create call notification
-  //     await setDoc(doc(db, 'calls', callData.callId), callData);
-      
-  //     // Create notification for receiver
-  //     await setDoc(doc(db, 'callNotifications', otherUserId), {
-  //       ...callData,
-  //       status: 'incoming'
-  //     });
-  
-  //     navigate(`/call/${taskId}/${otherUserId}`);
-  //   }
-  // };
-  // Add call status tracking
   const startCall = () => {
     navigate(`/call/${taskId}/${otherUserId}`);
   };
-  
-
-  
-  
-
   return (
-    <div className="p-4 bg-gray-50 h-screen">
-      <div className="max-w-4xl mx-auto h-full flex flex-col">
-        <div className="bg-white shadow-sm rounded-t-lg">
-          <div className="p-4 flex items-center justify-between border-b">
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => navigate('/dashboard')}
-                className="text-gray-600 hover:text-gray-800"
-              >
-                <FaArrowLeft />
-              </button>
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                  <BsPerson className="text-gray-600 text-xl" />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-gray-800">{taskTitle || 'Task Chat'}</h2>
-                  <span className="text-xs text-gray-500">
-                    Chatting with {user.userType === 'client' ? 'Assignee' : 'Client'}
-                  </span>
-                </div>
-              </div>
+    <div className="flex flex-col h-screen bg-gray-100">
+      <div className="bg-white border-b border-gray-200 p-4">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => navigate('/dashboard')} 
+            className="text-gray-600 hover:text-gray-800"
+          >
+            <BsArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">{task?.title}</h2>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <BsPerson className="w-4 h-4" />
+              <span>
+                {otherUser?.username || otherUser?.clientName || 'Loading...'}
+                {' - '}
+                {otherUser?.userType === 'client' ? 'Client' : 'Assignee'}
+              </span>
             </div>
-            <button
+          </div>
+          <button
               onClick={startCall}
               className="p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200"
             >
               <IoCallOutline className="text-xl" />
             </button>
-          </div>
-        </div>
-
-        <div className="flex-1 bg-gray-50 overflow-y-auto p-4 space-y-4">
-          {messages.map((message) => (
-            <div key={message.id} className={`flex gap-3 ${message.sender === user.userId ? 'flex-row-reverse' : ''}`}>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                  <BsPerson className="text-gray-600 text-lg" />
-                </div>
-              </div>
-              <div className={`flex-1 ${message.sender === user ? 'text-right' : ''}`}>
-                <div className={`inline-block max-w-[70%] p-3 rounded-lg ${
-                  message.sender === user.userId 
-                    ? 'bg-green-500 text-white' 
-                    : 'bg-white text-gray-800'
-                }`}>
-                  <p className="text-sm">{message.text}</p>
-                  <span className="text-xs opacity-75 mt-1 block">
-                    {new Date(message.timestamp).toLocaleTimeString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-
-        <div className="bg-white p-4 border-t">
-          <form onSubmit={handleSubmit} className="flex items-center gap-3">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message"
-              className="flex-1 p-3 bg-gray-50 rounded-lg text-sm focus:outline-none"
-            />
-            <button
-              type="submit"
-              className="p-3 bg-green-500 text-white rounded-full hover:bg-green-600"
-            >
-              <FiSend className="text-lg" />
-            </button>
-          </form>
         </div>
       </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message, index) => (
+          <div
+            key={index}
+            className={`flex ${message.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-[70%] rounded-lg p-3 ${
+                message.senderId === currentUser.id
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-white text-gray-800'
+              } shadow-sm`}
+            >
+              <div className="text-xs text-gray-500 mb-1">
+                {message.senderId === currentUser.id ? 'You' : message.senderName}
+              </div>
+              <div className="text-sm break-words">{message.text}</div>
+              <div className="text-xs text-gray-500 mt-1">
+                {new Date(message.timestamp).toLocaleTimeString([], { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })}
+              </div>
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-white border-t border-gray-200 p-4">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Type a message..."
+            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-green-500"
+          />
+          <button
+            type="submit"
+            disabled={!newMessage.trim() || !otherUser}
+            className="bg-green-500 text-white rounded-lg px-4 py-2 hover:bg-green-600 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <IoSend className="w-4 h-4" />
+            <span>Send</span>
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
