@@ -34,14 +34,20 @@ const VideoCall = () => {
         {
           urls: [
             'turn:relay.metered.ca:80',
-            'turn:relay.metered.ca:443'
+            'turn:relay.metered.ca:443',
+            'turn:relay.metered.ca:80?transport=tcp',
+            'turn:relay.metered.ca:443?transport=tcp',
+            'turns:relay.metered.ca:443'
           ],
           username: 'e8e9e650c3a7c6ee8e2442f2',
           credential: 'uBJCrqXhZHYwxwF9'
         }
-      ]
+      ],
+      iceCandidatePoolSize: 10,
+      iceTransportPolicy: 'relay'
     }
   };
+  
   
   
 
