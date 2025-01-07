@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Peer from 'simple-peer';
-import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../Firebase';
 import { BsCameraVideo, BsCameraVideoOff, BsMic, BsMicMute, BsArrowLeft, BsPerson } from 'react-icons/bs';
 import { IoCall, IoCallOutline } from 'react-icons/io5';
@@ -12,7 +12,6 @@ const VideoCall = () => {
   const navigate = useNavigate();
   const currentUser = useSelector(state => state.auth.currentUser);
   const [stream, setStream] = useState(null);
-  const [task, setTask] = useState(null);
   const [peer, setPeer] = useState(null);
   const [callCode, setCallCode] = useState('');
   const [connectionCode, setConnectionCode] = useState('');
@@ -22,9 +21,20 @@ const VideoCall = () => {
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
   const [callData, setCallData] = useState(null);
+  const [task, setTask] = useState(null);
   const myVideo = useRef();
   const remoteVideo = useRef();
   const timerRef = useRef();
+
+  const peerConfig = {
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+      ]
+    }
+  };
 
   useEffect(() => {
     const fetchTaskAndUser = async () => {
@@ -65,6 +75,25 @@ const VideoCall = () => {
     };
   }, [taskId, currentUser]);
 
+  useEffect(() => {
+    if (peer) {
+      peer.on('error', err => {
+        console.error('Peer connection error:', err);
+      });
+
+      peer.on('close', () => {
+        console.log('Peer connection closed');
+        endCall();
+      });
+    }
+
+    return () => {
+      if (peer) {
+        peer.destroy();
+      }
+    };
+  }, [peer]);
+
   const startTimer = () => {
     timerRef.current = setInterval(() => {
       setCallDuration(prev => prev + 1);
@@ -100,12 +129,14 @@ const VideoCall = () => {
     if (!mediaStream) return;
 
     const newPeer = new Peer({
+      ...peerConfig,
       initiator: true,
       trickle: false,
       stream: mediaStream
     });
 
     newPeer.on('signal', async data => {
+      console.log('Signaling data generated:', data.type);
       const newCallData = {
         taskId,
         initiator: currentUser.id,
@@ -120,12 +151,16 @@ const VideoCall = () => {
       console.log('Call initiated with code:', docRef.id);
     });
 
+    newPeer.on('connect', () => {
+      console.log('Peer connection established');
+      setIsCallActive(true);
+    });
+
     newPeer.on('stream', remoteStream => {
-      console.log('Received remote stream');
+      console.log('Remote stream received');
       if (remoteVideo.current) {
         remoteVideo.current.srcObject = remoteStream;
       }
-      setIsCallActive(true);
       startTimer();
     });
 
@@ -146,10 +181,11 @@ const VideoCall = () => {
         return;
       }
 
-      const callData = callDoc.data();
-      setCallData(callData);
+      const existingCallData = callDoc.data();
+      setCallData(existingCallData);
 
       const newPeer = new Peer({
+        ...peerConfig,
         initiator: false,
         trickle: false,
         stream: mediaStream
@@ -163,15 +199,20 @@ const VideoCall = () => {
         });
       });
 
+      newPeer.on('connect', () => {
+        console.log('Peer connection established');
+        setIsCallActive(true);
+      });
+
       newPeer.on('stream', remoteStream => {
+        console.log('Remote stream received');
         if (remoteVideo.current) {
           remoteVideo.current.srcObject = remoteStream;
         }
-        setIsCallActive(true);
         startTimer();
       });
 
-      newPeer.signal(callData.signal);
+      newPeer.signal(existingCallData.signal);
       setPeer(newPeer);
     } catch (error) {
       console.error('Error joining call:', error);
