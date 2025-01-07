@@ -32,14 +32,17 @@ const VideoCall = () => {
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         {
-          urls: 'turn:your-turn-server.com:3478',
-          username: 'your-username',
-          credential: 'your-password'
+          urls: [
+            'turn:relay.metered.ca:80',
+            'turn:relay.metered.ca:443'
+          ],
+          username: 'e8e9e650c3a7c6ee8e2442f2',
+          credential: 'uBJCrqXhZHYwxwF9'
         }
-      ],
-      iceCandidatePoolSize: 10
+      ]
     }
   };
+  
   
 
   useEffect(() => {
