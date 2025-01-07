@@ -2,10 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Peer from 'simple-peer';
+import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../Firebase';
-import { collection, addDoc, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
-import { BsCameraVideo, BsCameraVideoOff, BsMic, BsMicMute, BsArrowLeft, BsPerson } from 'react-icons/bs';
-import { IoCall, IoCallOutline } from 'react-icons/io5';
+import { PhoneIcon, PhoneXMarkIcon } from '@heroicons/react/24/solid';
 
 const VideoCall = () => {
   const { taskId } = useParams();
@@ -15,47 +14,32 @@ const VideoCall = () => {
   const [peer, setPeer] = useState(null);
   const [callCode, setCallCode] = useState('');
   const [isCallActive, setIsCallActive] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const [connectionCode, setConnectionCode] = useState('');
   const [callStatus, setCallStatus] = useState('');
   const [callDuration, setCallDuration] = useState(0);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-  const [otherUser, setOtherUser] = useState(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [callData, setCallData] = useState(null);
+  const [otherUser, setOtherUser] = useState(null);
   const myVideo = useRef();
   const remoteVideo = useRef();
   const timerRef = useRef();
+  const peerRef = useRef();
 
   const peerConfig = {
     config: {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' }
+        { urls: 'stun:stun2.l.google.com:19302' }
       ]
     }
   };
-  const toggleAudio = () => {
-    if (stream) {
-      stream.getAudioTracks().forEach(track => {
-        track.enabled = !isAudioEnabled;
-      });
-      setIsAudioEnabled(!isAudioEnabled);
-    }
-  };
-  
-  const toggleVideo = () => {
-    if (stream) {
-      stream.getVideoTracks().forEach(track => {
-        track.enabled = !isVideoEnabled;
-      });
-      setIsVideoEnabled(!isVideoEnabled);
-    }
-  };
+
   useEffect(() => {
     const fetchTaskAndUser = async () => {
       try {
+        console.log('🔄 Fetching task and user data...');
         const taskDoc = await getDoc(doc(db, 'tasks', taskId));
         if (taskDoc.exists()) {
           const taskData = taskDoc.data();
@@ -63,11 +47,13 @@ const VideoCall = () => {
           
           const userDoc = await getDoc(doc(db, 'users', otherUserId));
           if (userDoc.exists()) {
-            setOtherUser({ id: userDoc.id, ...userDoc.data() });
+            const userData = { id: userDoc.id, ...userDoc.data() };
+            console.log('👤 Other user data:', userData);
+            setOtherUser(userData);
           }
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('❌ Error fetching data:', error);
       }
     };
 
@@ -77,6 +63,7 @@ const VideoCall = () => {
   }, [taskId, currentUser]);
 
   const getMediaStream = async () => {
+    console.log('📹 Getting media stream...');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -89,19 +76,19 @@ const VideoCall = () => {
           noiseSuppression: true
         }
       });
-      setIsVideoEnabled(true);
+      console.log('✅ Media stream obtained');
       return stream;
     } catch (err) {
+      console.error('❌ Media stream error:', err);
       if (err.name === 'NotReadableError' || err.name === 'AbortError') {
-        const audioStream = await navigator.mediaDevices.getUserMedia({
+        console.log('🎤 Falling back to audio only...');
+        return await navigator.mediaDevices.getUserMedia({
           video: false,
           audio: {
             echoCancellation: true,
             noiseSuppression: true
           }
         });
-        setIsVideoEnabled(false);
-        return audioStream;
       }
       throw err;
     }
@@ -120,7 +107,8 @@ const VideoCall = () => {
   };
 
   const createCallSession = async (code, signalData) => {
-    await addDoc(collection(db, 'calls'), {
+    console.log('📝 Creating call session...', { code });
+    return await addDoc(collection(db, 'calls'), {
       code,
       taskId,
       from: currentUser.id,
@@ -128,16 +116,18 @@ const VideoCall = () => {
       signalData,
       type: 'offer',
       status: 'pending',
-      timestamp: new Date().toISOString(),
-      hasVideo: isVideoEnabled
+      timestamp: new Date().toISOString()
     });
   };
 
   const startCall = async () => {
+    console.log('🟢 Starting call as initiator...');
     try {
       const mediaStream = await getMediaStream();
       setStream(mediaStream);
-      myVideo.current.srcObject = mediaStream;
+      if (myVideo.current) {
+        myVideo.current.srcObject = mediaStream;
+      }
 
       const newPeer = new Peer({
         initiator: true,
@@ -147,30 +137,44 @@ const VideoCall = () => {
       });
 
       newPeer.on('signal', async data => {
+        console.log('📡 Generated offer signal');
         const code = Math.random().toString(36).substring(2);
         setCallCode(code);
         await createCallSession(code, data);
       });
 
-      newPeer.on('stream', remoteStream => {
-        remoteVideo.current.srcObject = remoteStream;
-        setIsCallActive(true);
+      newPeer.on('connect', () => {
+        console.log('🤝 Peer connection established');
+        setIsConnected(true);
         setCallStatus('Connected');
+        setIsCallActive(true);
         startTimer();
       });
 
+      newPeer.on('stream', remoteStream => {
+        console.log('📺 Received remote stream');
+        if (remoteVideo.current) {
+          remoteVideo.current.srcObject = remoteStream;
+        }
+      });
+
       setPeer(newPeer);
+      peerRef.current = newPeer;
+
     } catch (err) {
-      console.error('Error starting call:', err);
+      console.error('❌ Error starting call:', err);
       setCallStatus('Failed to start call');
     }
   };
 
   const joinCall = async () => {
+    console.log('🔵 Joining call with code:', connectionCode);
     try {
       const mediaStream = await getMediaStream();
       setStream(mediaStream);
-      myVideo.current.srcObject = mediaStream;
+      if (myVideo.current) {
+        myVideo.current.srcObject = mediaStream;
+      }
 
       const callQuery = query(
         collection(db, 'calls'),
@@ -182,6 +186,7 @@ const VideoCall = () => {
       const callData = snapshot.docs[0]?.data();
 
       if (!callData) {
+        console.error('❌ Invalid call code');
         setCallStatus('Invalid call code');
         return;
       }
@@ -194,6 +199,7 @@ const VideoCall = () => {
       });
 
       newPeer.on('signal', async data => {
+        console.log('📡 Generated answer signal');
         await addDoc(collection(db, 'calls'), {
           code: connectionCode,
           taskId,
@@ -205,27 +211,56 @@ const VideoCall = () => {
         });
       });
 
-      newPeer.on('stream', remoteStream => {
-        remoteVideo.current.srcObject = remoteStream;
-        setIsCallActive(true);
+      newPeer.on('connect', () => {
+        console.log('🤝 Peer connection established');
+        setIsConnected(true);
         setCallStatus('Connected');
+        setIsCallActive(true);
         startTimer();
+      });
+
+      newPeer.on('stream', remoteStream => {
+        console.log('📺 Received remote stream');
+        if (remoteVideo.current) {
+          remoteVideo.current.srcObject = remoteStream;
+        }
       });
 
       newPeer.signal(callData.signalData);
       setPeer(newPeer);
+      peerRef.current = newPeer;
+
     } catch (err) {
-      console.error('Error joining call:', err);
+      console.error('❌ Error joining call:', err);
       setCallStatus('Failed to join call');
     }
   };
 
+  const toggleAudio = () => {
+    if (stream) {
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = !isAudioEnabled;
+      });
+      setIsAudioEnabled(!isAudioEnabled);
+    }
+  };
+
+  const toggleVideo = () => {
+    if (stream) {
+      stream.getVideoTracks().forEach(track => {
+        track.enabled = !isVideoEnabled;
+      });
+      setIsVideoEnabled(!isVideoEnabled);
+    }
+  };
+
   const endCall = async () => {
+    console.log('🔴 Ending call...');
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
     }
-    if (peer) {
-      peer.destroy();
+    if (peerRef.current) {
+      peerRef.current.destroy();
     }
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -246,6 +281,7 @@ const VideoCall = () => {
     }
 
     setIsCallActive(false);
+    setIsConnected(false);
     setStream(null);
     setPeer(null);
     setCallCode('');
@@ -264,125 +300,96 @@ const VideoCall = () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
+      if (peerRef.current) {
+        peerRef.current.destroy();
+      }
     };
   }, []);
 
-  // Your existing JSX return remains the same
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="bg-white border-b border-gray-200 p-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="text-gray-600 hover:text-gray-800"
-            >
-              <BsArrowLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800">Video Call</h2>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <BsPerson className="w-4 h-4" />
-                <span>{otherUser?.username || otherUser?.clientName || 'Loading...'}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {!isCallActive && (
-        <div className="bg-white p-6 rounded-lg shadow-sm mx-4 mb-4">
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button
-              onClick={startCall}
-              className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2"
-            >
-              <IoCall className="w-5 h-5" />
-              Start New Call
-            </button>
-            
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={connectionCode}
-                onChange={(e) => setConnectionCode(e.target.value)}
-                placeholder="Enter call code"
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-green-500"
-              />
-              <button
-                onClick={joinCall}
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-              >
-                Join Call
-              </button>
-            </div>
-          </div>
-          
-          {callCode && (
-            <div className="mt-4 text-center">
-              <p className="text-gray-600">Share this code to join the call:</p>
-              <p className="text-xl font-bold text-gray-800 mt-2">{callCode}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-        <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+    <div className="h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
+      <div className="grid grid-cols-2 gap-4 w-full max-w-4xl">
+        <div className="relative aspect-video">
           <video
             ref={myVideo}
-            muted
             autoPlay
+            muted
             playsInline
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover rounded-lg"
           />
-          <div className="absolute bottom-4 left-4 text-white bg-black bg-opacity-50 px-2 py-1 rounded">
-            You
+          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
+            You ({currentUser?.fullName || currentUser?.clientName})
           </div>
         </div>
-        
-        <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+
+        <div className="relative aspect-video">
           <video
             ref={remoteVideo}
             autoPlay
             playsInline
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover rounded-lg"
           />
-          <div className="absolute bottom-4 left-4 text-white bg-black bg-opacity-50 px-2 py-1 rounded">
-            {otherUser?.username || otherUser?.clientName}
+          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
+            {otherUser?.username || otherUser?.clientName || 'Remote User'}
           </div>
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-        <div className="flex justify-center gap-4">
-          <button
-            onClick={toggleAudio}
-            className={`p-4 rounded-full ${isAudioEnabled ? 'bg-gray-200' : 'bg-red-500 text-white'}`}
-          >
-            {isAudioEnabled ? <BsMic size={24} /> : <BsMicMute size={24} />}
-          </button>
+      <div className="mt-4 flex flex-col items-center gap-4">
+        {callStatus && (
+          <div className={`text-sm ${callStatus === 'Connected' ? 'text-green-500' : 'text-red-500'}`}>
+            {callStatus}
+          </div>
+        )}
+        
+        {callDuration > 0 && (
+          <div className="text-white">
+            Duration: {formatDuration(callDuration)}
+          </div>
+        )}
 
-          <button
-            onClick={toggleVideo}
-            className={`p-4 rounded-full ${isVideoEnabled ? 'bg-gray-200' : 'bg-red-500 text-white'}`}
-          >
-            {isVideoEnabled ? <BsCameraVideo size={24} /> : <BsCameraVideoOff size={24} />}
-          </button>
+        <div className="flex gap-4">
+          {!isCallActive ? (
+            <>
+              <button
+                onClick={startCall}
+                className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+              >
+                <PhoneIcon className="h-5 w-5" />
+                Start Call
+              </button>
 
-          {(isCallActive || (callData && currentUser.id === callData.initiator)) && (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={connectionCode}
+                  onChange={(e) => setConnectionCode(e.target.value)}
+                  placeholder="Enter call code"
+                  className="px-4 py-2 rounded-lg border text-black"
+                />
+                <button
+                  onClick={joinCall}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
+                >
+                  Join Call
+                </button>
+              </div>
+            </>
+          ) : (
             <button
               onClick={endCall}
-              className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600"
+              className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
             >
-              <IoCallOutline size={24} />
+              <PhoneXMarkIcon className="h-5 w-5" />
+              End Call
             </button>
           )}
         </div>
 
-        {callDuration > 0 && (
-          <div className="text-center text-gray-600 mt-2">
-            {formatDuration(callDuration)}
+        {callCode && !isCallActive && (
+          <div className="mt-4 bg-white p-4 rounded-lg">
+            <p className="text-center text-gray-700">Share this code to join:</p>
+            <p className="text-xl font-bold text-gray-900 mt-2">{callCode}</p>
           </div>
         )}
       </div>
